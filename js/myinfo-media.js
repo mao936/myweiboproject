@@ -179,8 +179,7 @@ async function renderPostMedia(container, mediaList) {
   }
 
   const grid = document.createElement('div');
-  grid.className = 'post-media-grid';
-  grid.style.gridTemplateColumns = mediaList.length === 1 ? '1fr' : `repeat(${Math.min(mediaList.length, 3)}, 1fr)`;
+  grid.className = `media-grid count-${Math.min(mediaList.length, 9)}`;
 
   for (const media of mediaList) {
     const url = await createObjectURL(media.fileId);
@@ -190,6 +189,7 @@ async function renderPostMedia(container, mediaList) {
       const img = document.createElement('img');
       img.src = url;
       img.alt = '简讯图片';
+      img.className = 'post-image';
       grid.appendChild(img);
     }
   }
@@ -202,15 +202,11 @@ async function renderVideoPlayer(container, fileId) {
   if (!url) return;
 
   const wrapper = document.createElement('div');
-  wrapper.style.position = 'relative';
-  wrapper.style.borderRadius = 'var(--radius-sm)';
-  wrapper.style.overflow = 'hidden';
-  wrapper.style.border = '1px solid rgba(0, 240, 255, 0.2)';
-
+  wrapper.className = 'video-wrapper';
   wrapper.innerHTML = `
-    <video src="${url}" preload="metadata" playsinline style="width: 100%; display: block;"></video>
-    <div class="video-cover" style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); cursor: pointer;">
-      <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(0, 240, 255, 0.9); color: #000; display: flex; align-items: center; justify-content: center;">
+    <video src="${url}" preload="metadata" playsinline></video>
+    <div class="video-cover">
+      <div class="play-icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
       </div>
     </div>
@@ -222,23 +218,23 @@ async function renderVideoPlayer(container, fileId) {
   cover.addEventListener('click', () => {
     if (video.paused) {
       video.play();
-      cover.style.display = 'none';
+      cover.hidden = true;
     }
   });
 
   video.addEventListener('pause', () => {
-    cover.style.display = 'flex';
+    cover.hidden = false;
   });
 
   video.addEventListener('ended', () => {
-    cover.style.display = 'flex';
+    cover.hidden = false;
   });
 
   container.appendChild(wrapper);
 }
 
-async function renderGallery() {
-  const container = document.querySelector('.gallery');
+async function renderLibrary() {
+  const container = document.querySelector('.library');
   const empty = document.querySelector('.empty-state-library');
   const mediaList = await getAllMedia();
 
@@ -246,35 +242,139 @@ async function renderGallery() {
 
   if (mediaList.length === 0) {
     container.hidden = true;
-    if (empty) empty.hidden = false;
+    empty.hidden = false;
     return;
   }
 
   container.hidden = false;
-  if (empty) empty.hidden = true;
+  empty.hidden = true;
 
   for (const item of mediaList) {
     const url = await createObjectURL(item.id);
     if (!url) continue;
 
     const div = document.createElement('div');
-    div.className = 'gallery-item';
+    div.className = 'library-item';
     div.dataset.id = item.id;
 
     if (item.type === 'image') {
       div.innerHTML = `
         <img src="${url}" alt="${escapeHtml(item.name || '')}">
-        <div class="gallery-info">${escapeHtml(item.name || '图片')} · ${formatBytes(item.size || 0)}</div>
-        <button class="gallery-remove" type="button">×</button>
+        <div class="library-info">${escapeHtml(item.name || '图片')} · ${formatBytes(item.size || 0)}</div>
+        <button class="library-remove" type="button">×</button>
       `;
     } else {
       div.innerHTML = `
         <video src="${url}" muted></video>
-        <div class="gallery-info">${escapeHtml(item.name || '视频')} · ${formatBytes(item.size || 0)}</div>
-        <button class="gallery-remove" type="button">×</button>
+        <div class="library-info">${escapeHtml(item.name || '视频')} · ${formatBytes(item.size || 0)}</div>
+        <button class="library-remove" type="button">×</button>
       `;
     }
 
     container.appendChild(div);
   }
+}
+
+function initBackgroundSlider() {
+  const slides = document.querySelectorAll('.bg-slide');
+  const dots = document.querySelectorAll('.bg-dot');
+  const settingsBtn = document.querySelector('.bg-settings-btn');
+  const settingsPanel = document.querySelector('.bg-settings');
+  const intervalOptions = document.querySelectorAll('.bg-option');
+
+  if (!slides.length) return;
+
+  const NATURE_SEEDS = ['mountains', 'lake', 'forest', 'sunset', 'ocean', 'meadow'];
+
+  let current = 0;
+  let interval = getBgInterval();
+  let timer = null;
+
+  function getBgInterval() {
+    const data = loadData();
+    return (data && data.settings && data.settings.bgInterval) ? data.settings.bgInterval : 10;
+  }
+
+  function loadSlideImage(slide, url) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = url;
+    });
+  }
+
+  async function applyBackgrounds() {
+    for (let i = 0; i < slides.length; i++) {
+      const slide = slides[i];
+      let url = slide.dataset.image;
+      if (!url) {
+        const seed = slide.dataset.seed || NATURE_SEEDS[i % NATURE_SEEDS.length];
+        const width = window.innerWidth || 1920;
+        const height = window.innerHeight || 1080;
+        url = `https://picsum.photos/seed/${seed}/${width}/${height}`;
+      }
+      await loadSlideImage(slide, url);
+      slide.style.backgroundImage = `url('${url}')`;
+    }
+  }
+
+  function updateIntervalOptions() {
+    intervalOptions.forEach(btn => {
+      btn.classList.toggle('active', Number(btn.dataset.interval) === interval);
+    });
+  }
+
+  function nextSlide() {
+    slides[current].classList.remove('active');
+    dots[current].classList.remove('active');
+    current = (current + 1) % slides.length;
+    slides[current].classList.add('active');
+    dots[current].classList.add('active');
+  }
+
+  function start() {
+    if (timer) clearInterval(timer);
+    timer = setInterval(nextSlide, interval * 1000);
+  }
+
+  function restartTimer() {
+    start();
+  }
+
+  settingsBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsPanel.hidden = !settingsPanel.hidden;
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!settingsPanel.contains(e.target) && e.target !== settingsBtn) {
+      settingsPanel.hidden = true;
+    }
+  });
+
+  intervalOptions.forEach(btn => {
+    btn.addEventListener('click', () => {
+      interval = Number(btn.dataset.interval);
+      const data = loadData() || createDefaultData();
+      data.settings.bgInterval = interval;
+      saveData(data);
+      updateIntervalOptions();
+      restartTimer();
+      showToast(`背景切换间隔已设为 ${interval} 秒`);
+    });
+  });
+
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      applyBackgrounds();
+    }, 300);
+  });
+
+  updateIntervalOptions();
+  applyBackgrounds().then(() => {
+    start();
+  });
 }

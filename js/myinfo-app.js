@@ -1,5 +1,7 @@
 let data = loadData() || createSampleData();
+let currentTab = 'home';
 let searchQuery = '';
+let searchQueryMine = '';
 let expandedComments = new Set();
 let avatarObjectURL = null;
 let selectedMood = '';
@@ -7,6 +9,7 @@ let editingPostId = null;
 
 const els = {
   currentAvatar: document.querySelector('.current-avatar'),
+  currentAvatarSmall: document.querySelector('.current-avatar-small'),
   avatarInput: document.getElementById('avatar-input'),
   userName: document.querySelector('.user-name'),
   composeInput: document.querySelector('.compose-input'),
@@ -15,36 +18,38 @@ const els = {
   imageInput: document.getElementById('image-input'),
   videoInput: document.getElementById('video-input'),
   searchInput: document.querySelector('.search-input'),
-  postFlow: document.querySelector('.post-flow'),
+  searchInputMine: document.querySelector('.search-input-mine'),
+  postList: document.querySelector('.post-list'),
+  postListMine: document.querySelector('.post-list-mine'),
   emptyState: document.querySelector('.empty-state'),
-  library: document.querySelector('.gallery'),
+  emptyStateMine: document.querySelector('.empty-state-mine'),
   emptyStateLibrary: document.querySelector('.empty-state-library'),
+  navItems: document.querySelectorAll('.nav-item'),
+  library: document.querySelector('.library'),
   moodSelector: document.querySelector('.mood-selector')
 };
 
 async function init() {
-  applyStoredTheme();
+  const hashTab = window.location.hash.replace('#', '');
+  if (['home', 'mine', 'library'].includes(hashTab)) {
+    currentTab = hashTab;
+  }
+
   await loadAvatar();
   bindEvents();
   initMoodSelector();
+  initBackgroundSlider();
   updateComposeState();
-  render();
-  initThreeScene();
-  initScrollController();
-  setHeroShapeVisible(true);
-}
 
-function applyStoredTheme() {
-  const theme = data.settings?.theme || 'cyan';
-  if (window.updateThemeColor) {
-    updateThemeColor(theme);
-  } else {
-    document.documentElement.style.setProperty('--primary', `var(--${theme})`);
-  }
-
-  document.querySelectorAll('.theme-option').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.theme === theme);
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.tab === currentTab);
   });
+
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.hidden = panel.dataset.panel !== currentTab;
+  });
+
+  render();
 }
 
 async function loadAvatar() {
@@ -54,18 +59,20 @@ async function loadAvatar() {
       if (avatarObjectURL) URL.revokeObjectURL(avatarObjectURL);
       avatarObjectURL = url;
       els.currentAvatar.src = url;
+      if (els.currentAvatarSmall) els.currentAvatarSmall.src = url;
       return;
     }
   }
   const defaultAvatar = defaultAvatarSVG();
   els.currentAvatar.src = defaultAvatar;
+  if (els.currentAvatarSmall) els.currentAvatarSmall.src = defaultAvatar;
 }
 
 function defaultAvatarSVG() {
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-    <rect width="48" height="48" fill="#1a1a2e" rx="24"/>
-    <circle cx="24" cy="18" r="8" fill="#00f0ff" opacity="0.6"/>
-    <path d="M10 44c0-10 6.3-16 14-16s14 6 14 16v2H10z" fill="#b829dd" opacity="0.5"/>
+    <rect width="48" height="48" fill="#e5e5ea" rx="24"/>
+    <circle cx="24" cy="19" r="7" fill="#aeaeb2"/>
+    <path d="M11 42c0-9 5.8-15 13-15s13 6 13 15v2H11z" fill="#aeaeb2"/>
   </svg>`;
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }
@@ -86,7 +93,6 @@ async function saveAvatar(file) {
   data.currentUser.avatarFileId = fileId;
   saveData(data);
   await loadAvatar();
-  render();
   showToast('头像已更新');
 }
 
@@ -121,7 +127,11 @@ function updateComposeState() {
   const hasContent = len > 0 || pendingMedia.length > 0;
   els.composeSubmit.disabled = !hasContent || overLimit;
 
-  els.composeSubmit.textContent = editingPostId ? '保存' : '发布';
+  if (editingPostId) {
+    els.composeSubmit.textContent = '保存';
+  } else {
+    els.composeSubmit.textContent = '发布';
+  }
 }
 
 async function addPost() {
@@ -162,7 +172,6 @@ async function addPost() {
 
     data.posts.unshift(newPost);
     saveData(data);
-    showToast('简讯已发布');
   }
 
   els.composeInput.value = '';
@@ -170,6 +179,8 @@ async function addPost() {
   resetMoodSelector();
   updateComposeState();
   render();
+
+  if (currentTab !== 'home') switchTab('home');
 }
 
 async function deletePost(id) {
@@ -286,15 +297,20 @@ function editPost(id) {
   }
 
   updateComposeState();
-  scrollToSection(1);
-  setTimeout(() => els.composeInput.focus(), 500);
+  els.composeInput.focus();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function getFilteredPosts() {
+function getFilteredPosts(mineOnly = false) {
   let posts = data.posts.filter(p => !p.isHidden);
 
-  if (searchQuery.trim()) {
-    const q = searchQuery.toLowerCase();
+  if (mineOnly) {
+    posts = posts.filter(p => p.author === data.currentUser.name);
+  }
+
+  const query = mineOnly ? searchQueryMine : searchQuery;
+  if (query.trim()) {
+    const q = query.toLowerCase();
     posts = posts.filter(p =>
       p.content.toLowerCase().includes(q) ||
       p.author.toLowerCase().includes(q) ||
@@ -310,8 +326,8 @@ function getFilteredPosts() {
 }
 
 function iconLike(active) {
-  const color = active ? 'var(--pink)' : 'currentColor';
-  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="${active ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+  const fill = active ? 'currentColor' : 'none';
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="2"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
 }
 
 function iconComment() {
@@ -322,12 +338,16 @@ function iconRepost() {
   return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2.5l4 4.5-4 4.5M3 7h14M7 21.5l-4-4.5 4-4.5M21 17H7"/></svg>`;
 }
 
-async function createPostCard(post) {
-  const card = document.createElement('li');
-  card.className = 'cyber-card post-card';
-  if (post.isPinned) card.classList.add('pinned');
-  if (post.isRetracted) card.classList.add('retracted');
-  card.dataset.id = post.id;
+function iconClose() {
+  return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
+}
+
+async function createPostNode(post) {
+  const li = document.createElement('li');
+  li.className = 'post-item';
+  if (post.isPinned) li.classList.add('pinned');
+  if (post.isRetracted) li.classList.add('retracted');
+  li.dataset.id = post.id;
 
   const isMine = post.author === data.currentUser.name;
   const likedClass = post.likedByMe ? 'active' : '';
@@ -345,14 +365,14 @@ async function createPostCard(post) {
     topActions.push(`<button class="post-action-btn action-edit">编辑</button>`);
     topActions.push(`<button class="post-action-btn action-retract">${post.isRetracted ? '恢复' : '撤回'}</button>`);
     topActions.push(`<button class="post-action-btn action-hide">${post.isHidden ? '显示' : '隐藏'}</button>`);
-    topActions.push(`<button class="post-action-btn danger action-delete">删除</button>`);
+    topActions.push(`<button class="post-action-btn post-action-btn danger action-delete">删除</button>`);
   }
 
   const tagsHtml = (post.tags || []).map(tag =>
     `<span class="post-tag" data-tag="${escapeHtml(tag)}">#${escapeHtml(tag)}</span>`
   ).join('');
 
-  card.innerHTML = `
+  li.innerHTML = `
     <div class="post-header">
       <img class="avatar" src="${avatarUrl}" alt="头像">
       <div class="post-meta">
@@ -366,7 +386,7 @@ async function createPostCard(post) {
     </div>
     ${post.content ? `<div class="post-content">${escapeHtml(post.content)}</div>` : ''}
     ${tagsHtml ? `<div class="post-tags">${tagsHtml}</div>` : ''}
-    <div class="post-media-container"></div>
+    <div class="post-media" data-media='${JSON.stringify(post.media || [])}'></div>
     <div class="post-actions">
       <button class="action-btn action-like ${likedClass}" ${post.isRetracted ? 'disabled' : ''}>
         ${iconLike(post.likedByMe)}
@@ -386,12 +406,10 @@ async function createPostCard(post) {
     </div>
   `;
 
-  const mediaContainer = card.querySelector('.post-media-container');
+  const mediaContainer = li.querySelector('.post-media');
   await renderPostMedia(mediaContainer, post.media);
 
-  initCardTilt(card);
-
-  return card;
+  return li;
 }
 
 function createCommentsHtml(post) {
@@ -399,64 +417,69 @@ function createCommentsHtml(post) {
     ? post.comments.map(c => `
       <div class="comment-item">
         <span class="comment-author">${escapeHtml(c.author)}:</span>
-        <span>${escapeHtml(c.content)}</span>
+        <span class="comment-text">${escapeHtml(c.content)}</span>
       </div>
     `).join('')
-    : '<div class="comment-empty" style="font-size: 13px; color: var(--text-secondary);">暂无评论</div>';
+    : '<div class="comment-empty">暂无评论，来说两句吧</div>';
 
   return `
     <div class="comment-list">${list}</div>
     <form class="comment-form">
       <input class="comment-input" type="text" placeholder="写下你的评论..." maxlength="140">
-      <button class="cyber-btn comment-submit" type="submit" disabled style="padding: 8px 18px;">发送</button>
+      <button class="comment-submit" type="submit" disabled>发送</button>
     </form>
   `;
 }
 
-function initCardTilt(card) {
-  card.addEventListener('mousemove', (e) => {
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const rotateX = ((y - centerY) / centerY) * -8;
-    const rotateY = ((x - centerX) / centerX) * 8;
-
-    card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateZ(10px)`;
-  });
-
-  card.addEventListener('mouseleave', () => {
-    card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) translateZ(0)';
-  });
+async function render() {
+  if (currentTab === 'home') {
+    await renderList(getFilteredPosts(false), els.postList, els.emptyState, {
+      title: searchQuery.trim() ? '未找到相关简讯' : '还没有简讯',
+      desc: searchQuery.trim() ? '换个关键词试试吧' : '发布第一条简讯，记录此刻心情'
+    });
+  } else if (currentTab === 'mine') {
+    await renderList(getFilteredPosts(true), els.postListMine, els.emptyStateMine, {
+      title: searchQueryMine.trim() ? '未找到相关简讯' : '你还没有发布过简讯',
+      desc: searchQueryMine.trim() ? '换个关键词试试吧' : '在首页发布一条简讯吧'
+    });
+  } else if (currentTab === 'library') {
+    await renderLibrary();
+  }
 }
 
-async function render() {
-  const posts = getFilteredPosts();
+async function renderList(posts, listEl, emptyEl, messages) {
+  listEl.innerHTML = '';
 
-  if (els.postFlow) {
-    els.postFlow.innerHTML = '';
-
-    if (posts.length === 0) {
-      els.postFlow.hidden = true;
-      if (els.emptyState) {
-        els.emptyState.hidden = false;
-        els.emptyState.querySelector('.empty-title').textContent = searchQuery.trim() ? '未找到相关简讯' : '暂无简讯';
-        els.emptyState.querySelector('.empty-desc').textContent = searchQuery.trim() ? '换个关键词试试吧' : '前往发布区创建第一条简讯';
-      }
-    } else {
-      els.postFlow.hidden = false;
-      if (els.emptyState) els.emptyState.hidden = true;
-      for (const post of posts) {
-        els.postFlow.appendChild(await createPostCard(post));
-      }
+  if (posts.length === 0) {
+    listEl.hidden = true;
+    emptyEl.hidden = false;
+    emptyEl.querySelector('.empty-title').textContent = messages.title;
+    emptyEl.querySelector('.empty-desc').textContent = messages.desc;
+  } else {
+    listEl.hidden = false;
+    emptyEl.hidden = true;
+    for (const post of posts) {
+      listEl.appendChild(await createPostNode(post));
     }
   }
-
-  await renderGallery();
 }
 
-async function removeGalleryItem(id) {
+function switchTab(tab) {
+  currentTab = tab;
+  window.location.hash = tab;
+
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.classList.toggle('active', item.dataset.tab === tab);
+  });
+
+  document.querySelectorAll('.tab-panel').forEach(panel => {
+    panel.hidden = panel.dataset.panel !== tab;
+  });
+
+  render();
+}
+
+async function removeLibraryItem(id) {
   if (!confirm('确定从媒体库删除该文件吗？')) return;
 
   const usedInAvatar = data.currentUser.avatarFileId === id;
@@ -468,11 +491,15 @@ async function removeGalleryItem(id) {
   }
 
   await deleteMedia(id);
-  render();
+  renderLibrary();
   showToast('媒体已删除');
 }
 
 function bindEvents() {
+  els.navItems.forEach(item => {
+    item.addEventListener('click', () => switchTab(item.dataset.tab));
+  });
+
   els.currentAvatar.addEventListener('click', () => els.avatarInput.click());
 
   els.avatarInput.addEventListener('change', (e) => {
@@ -493,10 +520,8 @@ function bindEvents() {
   });
 
   els.composeInput.addEventListener('input', updateComposeState);
-  els.composeSubmit.addEventListener('click', (e) => {
-    e.preventDefault();
-    addPost();
-  });
+
+  els.composeSubmit.addEventListener('click', addPost);
 
   document.querySelector('.tool-image').addEventListener('click', () => els.imageInput.click());
   document.querySelector('.tool-video').addEventListener('click', () => els.videoInput.click());
@@ -520,89 +545,103 @@ function bindEvents() {
     }
   });
 
-  if (els.searchInput) {
-    els.searchInput.addEventListener('input', (e) => {
-      searchQuery = e.target.value;
-      render();
-    });
-  }
+  els.searchInput.addEventListener('input', (e) => {
+    searchQuery = e.target.value;
+    render();
+  });
 
-  if (els.postFlow) {
-    els.postFlow.addEventListener('click', handlePostClick);
-    els.postFlow.addEventListener('submit', handleCommentSubmit);
-    els.postFlow.addEventListener('input', handleCommentInput);
-  }
+  els.searchInputMine.addEventListener('input', (e) => {
+    searchQueryMine = e.target.value;
+    render();
+  });
+
+  els.postList.addEventListener('click', handlePostClick);
+  els.postListMine.addEventListener('click', handlePostClick);
+
+  [els.postList, els.postListMine].forEach(list => {
+    list.addEventListener('submit', handleCommentSubmit);
+    list.addEventListener('input', handleCommentInput);
+  });
 
   if (els.library) {
     els.library.addEventListener('click', (e) => {
-      const removeBtn = e.target.closest('.gallery-remove');
+      const removeBtn = e.target.closest('.library-remove');
       if (!removeBtn) return;
-      const item = removeBtn.closest('.gallery-item');
-      if (item) removeGalleryItem(item.dataset.id);
+      const item = removeBtn.closest('.library-item');
+      if (item) removeLibraryItem(item.dataset.id);
     });
   }
-
-  document.querySelectorAll('.theme-option').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const theme = btn.dataset.theme;
-      data.settings.theme = theme;
-      saveData(data);
-      updateThemeColor(theme);
-      document.querySelectorAll('.theme-option').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      showToast(`主题已切换为 ${theme}`);
-    });
-  });
-
-  document.querySelectorAll('.bg-interval').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const interval = Number(btn.dataset.interval);
-      data.settings.bgInterval = interval;
-      saveData(data);
-      document.querySelectorAll('.bg-interval').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      showToast(`背景切换间隔已设为 ${interval} 秒`);
-    });
-  });
-
-  document.querySelector('.clear-data')?.addEventListener('click', () => {
-    if (!confirm('确定要清空所有数据吗？此操作不可恢复。')) return;
-    localStorage.removeItem(STORAGE_KEY);
-    indexedDB.deleteDatabase('myinfo-media-db');
-    location.reload();
-  });
 }
 
 function handlePostClick(e) {
-  const postCard = e.target.closest('.post-card');
-  if (!postCard) return;
-  const id = postCard.dataset.id;
+  const postItem = e.target.closest('.post-item');
+  if (!postItem) return;
+  const id = postItem.dataset.id;
 
   const tagEl = e.target.closest('.post-tag');
   if (tagEl) {
-    searchQuery = tagEl.dataset.tag;
-    if (els.searchInput) els.searchInput.value = searchQuery;
-    scrollToSection(2);
+    const tag = tagEl.dataset.tag;
+    if (currentTab === 'mine') {
+      searchQueryMine = tag;
+      els.searchInputMine.value = tag;
+    } else {
+      searchQuery = tag;
+      els.searchInput.value = tag;
+    }
     render();
     return;
   }
 
-  if (e.target.closest('.action-pin')) { pinPost(id); return; }
-  if (e.target.closest('.action-unpin')) { unpinPost(id); return; }
-  if (e.target.closest('.action-edit')) { editPost(id); return; }
-  if (e.target.closest('.action-retract')) { retractPost(id); return; }
-  if (e.target.closest('.action-hide')) { hidePost(id); return; }
-  if (e.target.closest('.action-delete')) { deletePost(id); return; }
-  if (e.target.closest('.action-like')) { toggleLike(id); return; }
-  if (e.target.closest('.action-comment')) { toggleComment(id); return; }
-  if (e.target.closest('.action-repost')) { showToast('转发功能暂未实现'); }
+  if (e.target.closest('.action-pin')) {
+    pinPost(id);
+    return;
+  }
+
+  if (e.target.closest('.action-unpin')) {
+    unpinPost(id);
+    return;
+  }
+
+  if (e.target.closest('.action-edit')) {
+    editPost(id);
+    return;
+  }
+
+  if (e.target.closest('.action-retract')) {
+    retractPost(id);
+    return;
+  }
+
+  if (e.target.closest('.action-hide')) {
+    hidePost(id);
+    return;
+  }
+
+  if (e.target.closest('.action-delete')) {
+    deletePost(id);
+    return;
+  }
+
+  if (e.target.closest('.action-like')) {
+    toggleLike(id);
+    return;
+  }
+
+  if (e.target.closest('.action-comment')) {
+    toggleComment(id);
+    return;
+  }
+
+  if (e.target.closest('.action-repost')) {
+    showToast('转发功能暂未实现');
+  }
 }
 
 function handleCommentSubmit(e) {
   e.preventDefault();
-  const postCard = e.target.closest('.post-card');
-  if (!postCard) return;
-  const id = postCard.dataset.id;
+  const postItem = e.target.closest('.post-item');
+  if (!postItem) return;
+  const id = postItem.dataset.id;
   const input = e.target.querySelector('.comment-input');
   const content = input.value.trim();
   if (!content) return;

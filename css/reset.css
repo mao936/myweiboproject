@@ -1,20 +1,21 @@
 :root {
-  --bg: #050508;
-  --bg-secondary: #0a0a12;
-  --card-bg: rgba(10, 10, 18, 0.78);
-  --card-border: rgba(0, 240, 255, 0.18);
-  --cyan: #00f0ff;
-  --purple: #b829dd;
-  --pink: #ff2a6d;
-  --green: #05ffa1;
-  --yellow: #f7ff58;
-  --text: #ffffff;
-  --text-secondary: #8b92b9;
-  --danger: #ff2a6d;
-  --radius: 16px;
-  --radius-sm: 10px;
-  --shadow-cyan: 0 0 20px rgba(0, 240, 255, 0.35);
-  --shadow-purple: 0 0 30px rgba(184, 41, 221, 0.25);
+  --bg: #f5f5f7;
+  --card-bg: rgba(255, 255, 255, 0.82);
+  --card-solid: #ffffff;
+  --primary: #0071e3;
+  --primary-hover: #0077ed;
+  --text: #1d1d1f;
+  --text-secondary: #6e6e73;
+  --border: rgba(0, 0, 0, 0.08);
+  --hover-bg: rgba(0, 0, 0, 0.03);
+  --danger: #ff3b30;
+  --danger-bg: rgba(255, 59, 48, 0.08);
+  --success: #34c759;
+  --warning: #ff9500;
+  --radius: 18px;
+  --radius-sm: 12px;
+  --shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
 *, *::before, *::after {
@@ -25,17 +26,15 @@
 
 html {
   font-size: 15px;
-  scroll-behavior: smooth;
-  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "Exo 2", "PingFang SC", "Microsoft YaHei", sans-serif;
-  background: var(--bg);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background-color: var(--bg);
   color: var(--text);
-  line-height: 1.5;
+  line-height: 1.47059;
   min-height: 100vh;
-  overflow: hidden;
 }
 
 button, input, textarea {
@@ -60,17 +59,4 @@ ul, ol {
 
 [hidden] {
   display: none !important;
-}
-
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(0, 240, 255, 0.3);
-  border-radius: 3px;
 }

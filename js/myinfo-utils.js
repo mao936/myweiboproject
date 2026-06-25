@@ -74,8 +74,7 @@ function createDefaultData() {
       avatarFileId: null
     },
     settings: {
-      bgInterval: 10,
-      theme: 'cyan'
+      bgInterval: 10
     },
     posts: []
   };
@@ -89,25 +88,24 @@ function createSampleData() {
       avatarFileId: null
     },
     settings: {
-      bgInterval: 10,
-      theme: 'cyan'
+      bgInterval: 10
     },
     posts: [
       {
         id: `${now - 100000}-1`,
-        author: '未来探索者',
+        author: '旅行者小林',
         avatarFileId: null,
-        content: '在#赛博空间 发现了一片新大陆，科技感爆棚！',
-        mood: '🤔',
-        tags: ['赛博空间'],
+        content: '周末去了一趟#西湖，湖光山色真的太美了，推荐大家也去看看。',
+        mood: '😊',
+        tags: ['西湖'],
         createdAt: new Date(now - 100000).toISOString(),
         media: [],
-        likes: 42,
+        likes: 12,
         likedByMe: false,
         comments: [
-          { id: `${now - 80000}-c1`, author: '霓虹行者', content: '太酷了，求坐标！', createdAt: new Date(now - 80000).toISOString() }
+          { id: `${now - 80000}-c1`, author: '路人甲', content: '确实很美！', createdAt: new Date(now - 80000).toISOString() }
         ],
-        reposts: 8,
+        reposts: 2,
         isPinned: true,
         isRetracted: false,
         isHidden: false
@@ -116,32 +114,32 @@ function createSampleData() {
         id: `${now - 300000}-2`,
         author: '我',
         avatarFileId: null,
-        content: '沉浸式全屏滚动体验真的很棒，#未来感 十足。',
-        mood: '😊',
-        tags: ['未来感'],
+        content: '今天学习了新的前端知识，感觉收获满满。#学习 #前端',
+        mood: '🤔',
+        tags: ['学习', '前端'],
         createdAt: new Date(now - 300000).toISOString(),
         media: [],
-        likes: 15,
+        likes: 5,
         likedByMe: true,
         comments: [],
-        reposts: 2,
+        reposts: 0,
         isPinned: false,
         isRetracted: false,
         isHidden: false
       },
       {
         id: `${now - 600000}-3`,
-        author: '数字游民',
+        author: '摄影师阿明',
         avatarFileId: null,
-        content: '霓虹色搭配暗黑主题，视觉冲击力很强。#暗黑模式',
+        content: '分享一下昨天在#森林 拍的照片，光线刚刚好。',
         mood: '❤️',
-        tags: ['暗黑模式'],
+        tags: ['森林'],
         createdAt: new Date(now - 600000).toISOString(),
         media: [],
-        likes: 37,
+        likes: 28,
         likedByMe: false,
         comments: [],
-        reposts: 5,
+        reposts: 4,
         isPinned: false,
         isRetracted: false,
         isHidden: false
