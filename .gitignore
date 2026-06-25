@@ -1,1 +1,4 @@
 opencode.json
+node_modules/
+dist/
+*.log
