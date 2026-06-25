@@ -16,7 +16,7 @@ const avatarUrl = computed(() => props.postAvatarUrl || props.post.avatarUrl || 
 
 const displayMedia = computed(() => props.media || props.post.media || [])
 
-const emit = defineEmits(['like', 'comment', 'edit', 'delete', 'pin', 'retract', 'hide', 'add-comment', 'tag-click'])
+const emit = defineEmits(['like', 'favorite', 'comment', 'edit', 'delete', 'pin', 'retract', 'hide', 'add-comment', 'tag-click'])
 
 const timeText = computed(() => {
   const pinned = props.post.isPinned ? '置顶 · ' : ''
@@ -96,6 +96,15 @@ function onRetract() {
         @click="$emit('like')"
       >
         <span>{{ post.likes || 0 }}</span>
+      </button>
+      <button
+        class="action-btn action-favorite"
+        :class="{ active: post.isFavorited }"
+        type="button"
+        :disabled="post.isRetracted"
+        @click="$emit('favorite')"
+      >
+        <span>{{ post.isFavorited ? '已收藏' : '收藏' }}</span>
       </button>
       <button
         class="action-btn action-comment"

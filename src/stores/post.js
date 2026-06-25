@@ -88,6 +88,11 @@ export const usePostStore = defineStore('post', () => {
     replacePost(updated)
   }
 
+  async function toggleFavorite(id) {
+    const updated = await postRequest(`/posts/${id}/favorite`)
+    replacePost(updated)
+  }
+
   async function addComment(id, content) {
     const target = allPosts.value.find(p => p.id === id)
     if (!target || target.isRetracted) return
@@ -109,6 +114,7 @@ export const usePostStore = defineStore('post', () => {
     hidePost,
     showPost,
     likePost,
+    toggleFavorite,
     addComment
   }
 })

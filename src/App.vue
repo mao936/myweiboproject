@@ -23,6 +23,7 @@ const { theme, bgInterval } = storeToRefs(settingsStore)
 
 const currentTab = ref('home')
 const searchQueryMine = ref('')
+const searchQueryFavorites = ref('')
 const composeContent = ref('')
 const composeMood = ref('')
 const editingPostId = ref(null)
@@ -52,6 +53,25 @@ const minePosts = computed(() => {
 
   if (searchQueryMine.value.trim()) {
     const q = searchQueryMine.value.toLowerCase()
+    result = result.filter(p =>
+      p.content.toLowerCase().includes(q) ||
+      p.author.toLowerCase().includes(q) ||
+      (p.tags || []).some(tag => tag.toLowerCase().includes(q))
+    )
+  }
+
+  return result.sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1
+    if (!a.isPinned && b.isPinned) return 1
+    return new Date(b.createdAt) - new Date(a.createdAt)
+  })
+})
+
+const favoritePosts = computed(() => {
+  let result = filteredPosts.value.filter(p => p.isFavorited)
+
+  if (searchQueryFavorites.value.trim()) {
+    const q = searchQueryFavorites.value.toLowerCase()
     result = result.filter(p =>
       p.content.toLowerCase().includes(q) ||
       p.author.toLowerCase().includes(q) ||
@@ -143,6 +163,10 @@ async function deletePost(post) {
 
 function handleLike(id) {
   postStore.likePost(id)
+}
+
+function handleFavorite(id) {
+  postStore.toggleFavorite(id)
 }
 
 function toggleComments(id) {
@@ -260,13 +284,21 @@ function switchTab(tab) {
   }
 }
 
+function tabLabel(tab) {
+  if (tab === 'home') return '首页'
+  if (tab === 'mine') return '我的'
+  if (tab === 'favorites') return '收藏'
+  return '媒体库'
+}
+
 onMounted(async () => {
   const hashTab = window.location.hash.replace('#', '')
-  if (['home', 'mine', 'library'].includes(hashTab)) {
+  if (['home', 'mine', 'favorites', 'library'].includes(hashTab)) {
     currentTab.value = hashTab
   }
   await Promise.all([
     userStore.loadUser(),
+    userStore.loadFavorites(),
     settingsStore.loadSettings(),
     postStore.refresh()
   ])
@@ -287,14 +319,14 @@ onMounted(async () => {
         <a href="#" class="logo">我的简讯</a>
         <nav class="nav">
           <button
-            v-for="tab in ['home', 'mine', 'library']"
+            v-for="tab in ['home', 'mine', 'favorites', 'library']"
             :key="tab"
             class="nav-item"
             :class="{ active: currentTab === tab }"
             type="button"
             @click="switchTab(tab)"
           >
-            {{ tab === 'home' ? '首页' : tab === 'mine' ? '我的' : '媒体库' }}
+            {{ tabLabel(tab) }}
           </button>
         </nav>
       </div>
@@ -346,6 +378,7 @@ onMounted(async () => {
             :post-avatar-url="post.avatarUrl || ''"
             :comments-expanded="expandedComments.has(post.id)"
             @like="handleLike(post.id)"
+            @favorite="handleFavorite(post.id)"
             @comment="toggleComments(post.id)"
             @edit="startEdit(post)"
             @delete="deletePost(post)"
@@ -376,6 +409,7 @@ onMounted(async () => {
             :post-avatar-url="post.avatarUrl || ''"
             :comments-expanded="expandedComments.has(post.id)"
             @like="handleLike(post.id)"
+            @favorite="handleFavorite(post.id)"
             @comment="toggleComments(post.id)"
             @edit="startEdit(post)"
             @delete="deletePost(post)"
@@ -389,6 +423,37 @@ onMounted(async () => {
         <div v-else class="empty-state">
           <p class="empty-title">{{ searchQueryMine.trim() ? '未找到相关简讯' : '你还没有发布过简讯' }}</p>
           <p class="empty-desc">{{ searchQueryMine.trim() ? '换个关键词试试吧' : '在首页发布一条简讯吧' }}</p>
+        </div>
+      </section>
+
+      <section v-show="currentTab === 'favorites'" class="tab-panel">
+        <SearchBox
+          v-model="searchQueryFavorites"
+          placeholder="搜索收藏"
+        />
+        <ul v-if="favoritePosts.length" class="post-list">
+          <PostCard
+            v-for="post in favoritePosts"
+            :key="post.id"
+            :post="post"
+            :is-mine="post.author === name"
+            :post-avatar-url="post.avatarUrl || ''"
+            :comments-expanded="expandedComments.has(post.id)"
+            @like="handleLike(post.id)"
+            @favorite="handleFavorite(post.id)"
+            @comment="toggleComments(post.id)"
+            @edit="startEdit(post)"
+            @delete="deletePost(post)"
+            @pin="handlePin(post)"
+            @retract="handleRetract(post)"
+            @hide="handleHide(post)"
+            @add-comment="addComment(post.id, $event)"
+            @tag-click="handleTagClick"
+          />
+        </ul>
+        <div v-else class="empty-state">
+          <p class="empty-title">{{ searchQueryFavorites.trim() ? '未找到相关简讯' : '还没有收藏' }}</p>
+          <p class="empty-desc">{{ searchQueryFavorites.trim() ? '换个关键词试试吧' : '看到喜欢的简讯，点击收藏吧' }}</p>
         </div>
       </section>
 

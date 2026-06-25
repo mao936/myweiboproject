@@ -22,6 +22,7 @@ function createPostResponse(overrides = {}) {
     isPinned: false,
     isRetracted: false,
     isHidden: false,
+    isFavorited: false,
     ...overrides
   }
 }
@@ -132,6 +133,20 @@ describe('post store', () => {
     await store.likePost(created.id)
     expect(store.filteredPosts[0].likes).toBe(0)
     expect(store.filteredPosts[0].likedByMe).toBe(false)
+  })
+
+  it('should toggle favorite on a post', async () => {
+    const created = createPostResponse()
+    const store = await initStore([created])
+
+    post.mockResolvedValue({ ...created, isFavorited: true })
+    await store.toggleFavorite(created.id)
+    expect(post).toHaveBeenCalledWith(`/posts/${created.id}/favorite`)
+    expect(store.filteredPosts[0].isFavorited).toBe(true)
+
+    post.mockResolvedValue({ ...created, isFavorited: false })
+    await store.toggleFavorite(created.id)
+    expect(store.filteredPosts[0].isFavorited).toBe(false)
   })
 
   it('should not like a retracted post', async () => {

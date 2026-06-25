@@ -22,6 +22,7 @@ function createPost(overrides = {}) {
     isPinned: false,
     isRetracted: false,
     isHidden: false,
+    isFavorited: false,
     ...overrides
   }
 }
@@ -66,6 +67,16 @@ describe('PostCard', () => {
     })
     await wrapper.find('.action-like').trigger('click')
     expect(wrapper.emitted('like')).toHaveLength(1)
+  })
+
+  it('emits favorite when favorite button clicked and shows active state', async () => {
+    const wrapper = mount(PostCard, {
+      props: { post: createPost({ isFavorited: true }), isMine: false, postAvatarUrl: '' }
+    })
+    expect(wrapper.find('.action-favorite').classes()).toContain('active')
+    expect(wrapper.find('.action-favorite').text()).toContain('已收藏')
+    await wrapper.find('.action-favorite').trigger('click')
+    expect(wrapper.emitted('favorite')).toHaveLength(1)
   })
 
   it('emits comment when comment button clicked', async () => {
