@@ -8,8 +8,11 @@ const props = defineProps({
   post: { type: Object, required: true },
   isMine: { type: Boolean, default: false },
   postAvatarUrl: { type: String, default: '' },
-  commentsExpanded: { type: Boolean, default: false }
+  commentsExpanded: { type: Boolean, default: false },
+  media: { type: Array, default: null }
 })
+
+const displayMedia = computed(() => props.media || props.post.media || [])
 
 const emit = defineEmits(['like', 'comment', 'edit', 'delete', 'pin', 'retract', 'hide', 'add-comment', 'tag-click'])
 
@@ -79,7 +82,7 @@ function onRetract() {
           @click="$emit('tag-click', tag)"
         >#{{ tag }}</span>
       </div>
-      <MediaGallery :media="post.media || []" />
+      <MediaGallery :media="displayMedia" />
     </template>
 
     <div class="post-actions">

@@ -39,6 +39,7 @@ const toastVisible = ref(false)
 const toastTimer = ref(null)
 const avatarUrl = ref('')
 const postAvatarUrls = ref({})
+const postMediaUrls = ref({})
 const libraryItems = ref([])
 const bgIndex = ref(0)
 const bgSettingsOpen = ref(false)
@@ -114,7 +115,7 @@ async function updateAvatar(file) {
 
   userStore.updateAvatar(fileId)
   await loadAvatar()
-  await loadPostAvatars()
+  await loadPostAssets()
   showToast('头像已更新')
 }
 
@@ -137,7 +138,7 @@ async function publishPost() {
   composeContent.value = ''
   composeMood.value = ''
   await nextTick()
-  await loadPostAvatars()
+  await loadPostAssets()
 }
 
 function startEdit(post) {
@@ -159,7 +160,7 @@ async function deletePost(post) {
   postStore.deletePost(post.id)
   expandedComments.value.delete(post.id)
   await cleanupOrphans()
-  await loadPostAvatars()
+  await loadPostAssets()
   showToast('已删除')
 }
 
@@ -276,6 +277,30 @@ async function loadPostAvatars() {
   postAvatarUrls.value = newUrls
 }
 
+async function loadPostMedia() {
+  const map = {}
+  for (const post of postStore.posts) {
+    if (!post.media?.length) continue
+    const resolved = []
+    for (const item of post.media) {
+      const existing = postMediaUrls.value[post.id]?.find(m => m.fileId === item.fileId)
+      if (existing?.url) {
+        resolved.push(existing)
+      } else {
+        const url = await createObjectURL(item.fileId)
+        if (url) resolved.push({ ...item, url })
+      }
+    }
+    if (resolved.length) map[post.id] = resolved
+  }
+  postMediaUrls.value = map
+}
+
+async function loadPostAssets() {
+  await loadPostAvatars()
+  await loadPostMedia()
+}
+
 async function loadLibrary() {
   await mediaStore.loadMediaLibrary()
   const items = []
@@ -311,7 +336,7 @@ function switchTab(tab) {
 }
 
 watch(avatarFileId, loadAvatar)
-watch(() => postStore.posts, loadPostAvatars, { deep: true })
+watch(() => postStore.posts, loadPostAssets, { deep: true })
 
 onMounted(async () => {
   const hashTab = window.location.hash.replace('#', '')
@@ -319,7 +344,7 @@ onMounted(async () => {
     currentTab.value = hashTab
   }
   await loadAvatar()
-  await loadPostAvatars()
+  await loadPostAssets()
 })
 </script>
 
@@ -394,6 +419,7 @@ onMounted(async () => {
             :post="post"
             :is-mine="post.author === name"
             :post-avatar-url="postAvatarUrls[post.avatarFileId] || ''"
+            :media="postMediaUrls[post.id]"
             :comments-expanded="expandedComments.has(post.id)"
             @like="handleLike(post.id)"
             @comment="toggleComments(post.id)"
@@ -424,6 +450,7 @@ onMounted(async () => {
             :post="post"
             :is-mine="true"
             :post-avatar-url="postAvatarUrls[post.avatarFileId] || ''"
+            :media="postMediaUrls[post.id]"
             :comments-expanded="expandedComments.has(post.id)"
             @like="handleLike(post.id)"
             @comment="toggleComments(post.id)"
