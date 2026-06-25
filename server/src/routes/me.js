@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
-import { getUser, updateUser, setAvatar, removeAvatar } from '../store/userStore.js'
+import { getUser, updateUser, setAvatar, removeAvatar, getFavorites, addFavorite, removeFavorite } from '../store/userStore.js'
 import { saveMedia, getMediaData, getMedia } from '../store/mediaStore.js'
+import { getPost } from '../store/postStore.js'
 import { generateId } from '../utils/id.js'
 
 const me = new Hono()
@@ -41,6 +42,23 @@ me.delete('/avatar', (c) => {
     removeAvatar()
   }
   return c.json(getUser())
+})
+
+me.get('/favorites', (c) => {
+  return c.json(getFavorites())
+})
+
+me.post('/favorites/:postId', (c) => {
+  const postId = c.req.param('postId')
+  if (!getPost(postId)) {
+    return c.json({ error: 'post not found' }, 404)
+  }
+  return c.json(addFavorite(postId), 201)
+})
+
+me.delete('/favorites/:postId', (c) => {
+  const postId = c.req.param('postId')
+  return c.json(removeFavorite(postId))
 })
 
 export default me

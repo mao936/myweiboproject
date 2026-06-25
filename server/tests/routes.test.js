@@ -12,7 +12,7 @@ describe('routes', () => {
       const res = await app.request('/api/me')
       expect(res.status).toBe(200)
       const json = await res.json()
-      expect(json).toEqual({ name: '我', avatarFileId: null, avatarUrl: null })
+      expect(json).toEqual({ name: '我', avatarFileId: null, avatarUrl: null, favorites: [] })
     })
   })
 
@@ -24,7 +24,7 @@ describe('routes', () => {
         body: JSON.stringify({ name: '小明' })
       })
       expect(res.status).toBe(200)
-      expect(await res.json()).toEqual({ name: '小明', avatarFileId: null, avatarUrl: null })
+      expect(await res.json()).toEqual({ name: '小明', avatarFileId: null, avatarUrl: null, favorites: [] })
     })
 
     it('rejects empty name', async () => {
@@ -49,6 +49,7 @@ describe('routes', () => {
       const json = await res.json()
       expect(json.avatarFileId).toBeTruthy()
       expect(json.name).toBe('我')
+      expect(json.favorites).toEqual([])
     })
 
     it('rejects missing avatar', async () => {

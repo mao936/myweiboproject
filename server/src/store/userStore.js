@@ -1,9 +1,9 @@
 const SERVER_BASE_URL = process.env.SERVER_BASE_URL || 'http://localhost:3000'
 
-let user = { name: '我', avatarFileId: null }
+let user = { name: '我', avatarFileId: null, favorites: [] }
 
 export function resetUser() {
-  user = { name: '我', avatarFileId: null }
+  user = { name: '我', avatarFileId: null, favorites: [] }
 }
 
 function toMediaUrl(id) {
@@ -29,4 +29,24 @@ export function setAvatar(fileId) {
 export function removeAvatar() {
   user.avatarFileId = null
   return getUser()
+}
+
+export function getFavorites() {
+  return [...user.favorites]
+}
+
+export function addFavorite(postId) {
+  if (!user.favorites.includes(postId)) {
+    user.favorites.push(postId)
+  }
+  return getFavorites()
+}
+
+export function removeFavorite(postId) {
+  user.favorites = user.favorites.filter(id => id !== postId)
+  return getFavorites()
+}
+
+export function isFavorite(postId) {
+  return user.favorites.includes(postId)
 }

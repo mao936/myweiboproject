@@ -1,6 +1,7 @@
 import { generateId } from '../utils/id.js'
 import { extractTags } from '../utils/extractTags.js'
 import { getMedia } from './mediaStore.js'
+import { isFavorite } from './userStore.js'
 
 const SERVER_BASE_URL = process.env.SERVER_BASE_URL || 'http://localhost:3000'
 
@@ -30,7 +31,7 @@ export function enrichPost(post) {
       duration: mediaRecord?.duration ?? null
     }
   })
-  return { ...post, avatarUrl, media }
+  return { ...post, avatarUrl, media, isFavorited: isFavorite(post.id) }
 }
 
 export function listPosts(query = '') {

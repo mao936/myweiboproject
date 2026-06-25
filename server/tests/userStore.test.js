@@ -4,7 +4,11 @@ import {
   updateUser,
   setAvatar,
   removeAvatar,
-  resetUser
+  resetUser,
+  getFavorites,
+  addFavorite,
+  removeFavorite,
+  isFavorite
 } from '../src/store/userStore.js'
 
 describe('userStore', () => {
@@ -13,7 +17,7 @@ describe('userStore', () => {
   })
 
   it('returns seeded user', () => {
-    expect(getUser()).toEqual({ name: '我', avatarFileId: null, avatarUrl: null })
+    expect(getUser()).toEqual({ name: '我', avatarFileId: null, avatarUrl: null, favorites: [] })
   })
 
   it('updates user name', () => {
@@ -36,6 +40,22 @@ describe('userStore', () => {
 
   it('ignores unknown fields', () => {
     updateUser({ name: 'Bob', age: 30 })
-    expect(getUser()).toEqual({ name: 'Bob', avatarFileId: null, avatarUrl: null })
+    expect(getUser()).toEqual({ name: 'Bob', avatarFileId: null, avatarUrl: null, favorites: [] })
+  })
+
+  it('manages favorites', () => {
+    expect(getFavorites()).toEqual([])
+    expect(isFavorite('post-1')).toBe(false)
+    addFavorite('post-1')
+    expect(getFavorites()).toEqual(['post-1'])
+    expect(isFavorite('post-1')).toBe(true)
+    addFavorite('post-1')
+    expect(getFavorites()).toEqual(['post-1'])
+    addFavorite('post-2')
+    expect(getFavorites()).toEqual(['post-1', 'post-2'])
+    removeFavorite('post-1')
+    expect(getFavorites()).toEqual(['post-2'])
+    removeFavorite('missing')
+    expect(getFavorites()).toEqual(['post-2'])
   })
 })

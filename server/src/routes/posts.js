@@ -14,7 +14,7 @@ import {
   addComment,
   enrichPost
 } from '../store/postStore.js'
-import { getUser } from '../store/userStore.js'
+import { getUser, isFavorite, addFavorite, removeFavorite } from '../store/userStore.js'
 
 const posts = new Hono()
 
@@ -80,6 +80,18 @@ posts.post('/:id/like', (c) => {
   const post = toggleLike(id)
   if (!post) return c.json({ error: 'post not found or retracted' }, 404)
   return c.json(enrichPost(post))
+})
+
+posts.post('/:id/favorite', (c) => {
+  const id = c.req.param('id')
+  const post = getPost(id)
+  if (!post) return c.json({ error: 'post not found' }, 404)
+  if (isFavorite(id)) {
+    removeFavorite(id)
+  } else {
+    addFavorite(id)
+  }
+  return c.json(enrichPost(getPost(id)))
 })
 
 posts.post('/:id/retract', (c) => {
