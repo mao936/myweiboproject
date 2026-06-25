@@ -1,0 +1,76 @@
+:root {
+  --bg: #050508;
+  --bg-secondary: #0a0a12;
+  --card-bg: rgba(10, 10, 18, 0.78);
+  --card-border: rgba(0, 240, 255, 0.18);
+  --cyan: #00f0ff;
+  --purple: #b829dd;
+  --pink: #ff2a6d;
+  --green: #05ffa1;
+  --yellow: #f7ff58;
+  --text: #ffffff;
+  --text-secondary: #8b92b9;
+  --danger: #ff2a6d;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --shadow-cyan: 0 0 20px rgba(0, 240, 255, 0.35);
+  --shadow-purple: 0 0 30px rgba(184, 41, 221, 0.25);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 15px;
+  scroll-behavior: smooth;
+  overflow: hidden;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Exo 2", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+button, input, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+img, video {
+  max-width: 100%;
+  display: block;
+}
+
+ul, ol {
+  list-style: none;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.3);
+  border-radius: 3px;
+}
