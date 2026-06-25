@@ -1,7 +1,7 @@
 import { generateId } from '../utils/id.js'
 import { extractTags } from '../utils/extractTags.js'
 import { getMedia } from './mediaStore.js'
-import { isFavorite } from './userStore.js'
+import { isFavorite, isReposted, addRepost, removeRepost } from './userStore.js'
 
 const SERVER_BASE_URL = process.env.SERVER_BASE_URL || 'http://localhost:3000'
 
@@ -31,7 +31,7 @@ export function enrichPost(post) {
       duration: mediaRecord?.duration ?? null
     }
   })
-  return { ...post, avatarUrl, media, isFavorited: isFavorite(post.id) }
+  return { ...post, avatarUrl, media, isFavorited: isFavorite(post.id), isReposted: isReposted(post.id) }
 }
 
 export function listPosts(query = '') {
@@ -119,6 +119,19 @@ export function toggleLike(id) {
   if (!post || post.isRetracted) return null
   post.likedByMe = !post.likedByMe
   post.likes += post.likedByMe ? 1 : -1
+  return post
+}
+
+export function toggleRepost(id) {
+  const post = getPost(id)
+  if (!post || post.isRetracted) return null
+  if (isReposted(id)) {
+    removeRepost(id)
+    post.reposts--
+  } else {
+    addRepost(id)
+    post.reposts++
+  }
   return post
 }
 
