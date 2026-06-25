@@ -12,6 +12,8 @@ const props = defineProps({
   media: { type: Array, default: null }
 })
 
+const avatarUrl = computed(() => props.postAvatarUrl || props.post.avatarUrl || '')
+
 const displayMedia = computed(() => props.media || props.post.media || [])
 
 const emit = defineEmits(['like', 'comment', 'edit', 'delete', 'pin', 'retract', 'hide', 'add-comment', 'tag-click'])
@@ -48,7 +50,7 @@ function onRetract() {
 <template>
   <li class="post-item" :class="{ pinned: post.isPinned, retracted: post.isRetracted }">
     <div class="post-header">
-      <img class="avatar" :src="postAvatarUrl || defaultAvatar()" alt="头像">
+      <img class="avatar" :src="avatarUrl || defaultAvatar()" alt="头像">
       <div class="post-meta">
         <div class="post-author">
           {{ post.author }}

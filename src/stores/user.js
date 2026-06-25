@@ -1,20 +1,27 @@
 import { defineStore } from 'pinia'
-import { computed } from 'vue'
-import { useLocalStorage } from '@/composables/useLocalStorage'
+import { computed, ref } from 'vue'
+import { get, patch, postFile } from '@/api/client'
 
 export const useUserStore = defineStore('user', () => {
-  const storage = useLocalStorage('myinfo-user', { name: '我', avatarFileId: null })
+  const profile = ref({ name: '我', avatarFileId: null, avatarUrl: null })
 
-  const name = computed(() => storage.value.name)
-  const avatarFileId = computed(() => storage.value.avatarFileId)
+  const name = computed(() => profile.value.name)
+  const avatarFileId = computed(() => profile.value.avatarFileId)
+  const avatarUrl = computed(() => profile.value.avatarUrl)
 
-  function updateName(newName) {
-    storage.value = { ...storage.value, name: newName }
+  async function loadUser() {
+    profile.value = await get('/me')
   }
 
-  function updateAvatar(fileId) {
-    storage.value = { ...storage.value, avatarFileId: fileId }
+  async function updateName(newName) {
+    await patch('/me', { name: newName })
+    profile.value = { ...profile.value, name: newName }
   }
 
-  return { name, avatarFileId, updateName, updateAvatar }
+  async function updateAvatar(file) {
+    await postFile('/me/avatar', { avatar: file })
+    await loadUser()
+  }
+
+  return { name, avatarFileId, avatarUrl, profile, loadUser, updateName, updateAvatar }
 })

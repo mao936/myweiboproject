@@ -18,7 +18,7 @@ const gridClass = computed(() => {
   <div v-if="media.length" class="post-media" :class="gridClass">
     <div
       v-for="item in media"
-      :key="item.fileId"
+      :key="item.id || item.fileId"
       class="media-item"
     >
       <img v-if="item.type === 'image'" :src="item.url" :alt="item.name || ''">

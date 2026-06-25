@@ -1,4 +1,8 @@
 opencode.json
 node_modules/
 dist/
+server/node_modules/
+server/dist/
 *.log
+.agents/
+skills-lock.json

@@ -1,149 +1,105 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { useLocalStorage } from '@/composables/useLocalStorage'
-import { useUserStore } from './user'
-import { generateId } from '@/utils/id'
-import { extractTags } from '@/utils/extractTags'
+import { get, patch, post as postRequest, del } from '@/api/client'
 
 export const usePostStore = defineStore('post', () => {
-  const userStore = useUserStore()
-  const storage = useLocalStorage('myinfo-posts', [])
-  const posts = ref(storage.value)
+  const allPosts = ref([])
   const searchQuery = ref('')
 
   const filteredPosts = computed(() => {
-    let result = posts.value.filter(p => !p.isHidden)
-
-    if (searchQuery.value.trim()) {
-      const q = searchQuery.value.toLowerCase()
-      result = result.filter(p =>
-        p.content.toLowerCase().includes(q) ||
-        p.author.toLowerCase().includes(q) ||
-        (p.tags || []).some(tag => tag.toLowerCase().includes(q))
-      )
-    }
-
-    return result.sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1
-      if (!a.isPinned && b.isPinned) return 1
-      return new Date(b.createdAt) - new Date(a.createdAt)
-    })
+    return allPosts.value
+      .filter(p => !p.isHidden)
+      .sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1
+        if (!a.isPinned && b.isPinned) return 1
+        return new Date(b.createdAt) - new Date(a.createdAt)
+      })
   })
 
-  function syncStorage() {
-    storage.value = posts.value
-  }
-
-  function addPost({ content, mood = '', media = [] }) {
-    const post = {
-      id: generateId(),
-      author: userStore.name,
-      avatarFileId: userStore.avatarFileId,
-      content,
-      mood,
-      tags: extractTags(content),
-      createdAt: new Date().toISOString(),
-      media,
-      likes: 0,
-      likedByMe: false,
-      comments: [],
-      reposts: 0,
-      isPinned: false,
-      isRetracted: false,
-      isHidden: false
-    }
-
-    posts.value.unshift(post)
-    syncStorage()
-    return post
-  }
-
-  function editPost(id, { content, mood }) {
-    const post = posts.value.find(p => p.id === id)
-    if (!post) return
-
-    post.content = content
-    post.mood = mood
-    post.tags = extractTags(content)
-    syncStorage()
-  }
-
-  function deletePost(id) {
-    posts.value = posts.value.filter(p => p.id !== id)
-    syncStorage()
-  }
-
-  function pinPost(id) {
-    posts.value.forEach(p => { p.isPinned = false })
-    const post = posts.value.find(p => p.id === id)
-    if (post) {
-      post.isPinned = true
-      syncStorage()
+  function replacePost(updated) {
+    const index = allPosts.value.findIndex(p => p.id === updated.id)
+    if (index >= 0) {
+      allPosts.value.splice(index, 1, updated)
     }
   }
 
-  function unpinPost(id) {
-    const post = posts.value.find(p => p.id === id)
-    if (post) {
-      post.isPinned = false
-      syncStorage()
-    }
-  }
-
-  function retractPost(id) {
-    const post = posts.value.find(p => p.id === id)
-    if (post) {
-      post.isRetracted = !post.isRetracted
-      syncStorage()
-    }
-  }
-
-  function hidePost(id) {
-    const post = posts.value.find(p => p.id === id)
-    if (post) {
-      post.isHidden = true
-      syncStorage()
-    }
-  }
-
-  function showPost(id) {
-    const post = posts.value.find(p => p.id === id)
-    if (post) {
-      post.isHidden = false
-      syncStorage()
-    }
-  }
-
-  function likePost(id) {
-    const post = posts.value.find(p => p.id === id)
-    if (!post || post.isRetracted) return
-
-    post.likedByMe = !post.likedByMe
-    post.likes += post.likedByMe ? 1 : -1
-    syncStorage()
-  }
-
-  function addComment(id, content) {
-    const post = posts.value.find(p => p.id === id)
-    if (!post || post.isRetracted) return
-
-    post.comments.push({
-      id: generateId(),
-      author: '路人甲',
-      content,
-      createdAt: new Date().toISOString()
-    })
-    syncStorage()
+  async function refresh() {
+    const query = searchQuery.value.trim()
+    const path = query ? `/posts?q=${encodeURIComponent(query)}` : '/posts'
+    allPosts.value = await get(path)
   }
 
   function search(query) {
     searchQuery.value = query
+    return refresh()
+  }
+
+  async function addPost({ content, mood = '', media = [] }) {
+    const payload = {
+      content,
+      mood,
+      media: media.map(m => ({ id: m.id || m.fileId, type: m.type }))
+    }
+    const created = await postRequest('/posts', payload)
+    allPosts.value.unshift(created)
+    return created
+  }
+
+  async function editPost(id, { content, mood }) {
+    const updated = await patch(`/posts/${id}`, { content, mood })
+    replacePost(updated)
+  }
+
+  async function deletePost(id) {
+    await del(`/posts/${id}`)
+    allPosts.value = allPosts.value.filter(p => p.id !== id)
+  }
+
+  async function pinPost(id) {
+    const updated = await postRequest(`/posts/${id}/pin`)
+    allPosts.value.forEach(p => { p.isPinned = false })
+    replacePost(updated)
+  }
+
+  async function unpinPost(id) {
+    const updated = await del(`/posts/${id}/pin`)
+    replacePost(updated)
+  }
+
+  async function retractPost(id) {
+    const updated = await postRequest(`/posts/${id}/retract`)
+    replacePost(updated)
+  }
+
+  async function hidePost(id) {
+    const updated = await postRequest(`/posts/${id}/hide`)
+    replacePost(updated)
+  }
+
+  async function showPost(id) {
+    const updated = await del(`/posts/${id}/hide`)
+    replacePost(updated)
+  }
+
+  async function likePost(id) {
+    const target = allPosts.value.find(p => p.id === id)
+    if (!target || target.isRetracted) return
+    const updated = await postRequest(`/posts/${id}/like`)
+    replacePost(updated)
+  }
+
+  async function addComment(id, content) {
+    const target = allPosts.value.find(p => p.id === id)
+    if (!target || target.isRetracted) return
+    const updated = await postRequest(`/posts/${id}/comments`, { content })
+    replacePost(updated)
   }
 
   return {
-    posts,
     filteredPosts,
     searchQuery,
+    refresh,
+    search,
     addPost,
     editPost,
     deletePost,
@@ -153,7 +109,6 @@ export const usePostStore = defineStore('post', () => {
     hidePost,
     showPost,
     likePost,
-    addComment,
-    search
+    addComment
   }
 })

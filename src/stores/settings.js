@@ -1,20 +1,26 @@
 import { defineStore } from 'pinia'
-import { computed } from 'vue'
-import { useLocalStorage } from '@/composables/useLocalStorage'
+import { computed, ref } from 'vue'
+import { get, patch } from '@/api/client'
 
 export const useSettingsStore = defineStore('settings', () => {
-  const storage = useLocalStorage('myinfo-settings', { theme: 'cyan', bgInterval: 10 })
+  const settings = ref({ theme: 'cyan', bgInterval: 10 })
 
-  const theme = computed(() => storage.value.theme)
-  const bgInterval = computed(() => storage.value.bgInterval)
+  const theme = computed(() => settings.value.theme)
+  const bgInterval = computed(() => settings.value.bgInterval)
 
-  function setTheme(newTheme) {
-    storage.value = { ...storage.value, theme: newTheme }
+  async function loadSettings() {
+    settings.value = await get('/settings')
   }
 
-  function setBgInterval(interval) {
-    storage.value = { ...storage.value, bgInterval: interval }
+  async function setTheme(newTheme) {
+    await patch('/settings', { theme: newTheme })
+    settings.value = { ...settings.value, theme: newTheme }
   }
 
-  return { theme, bgInterval, setTheme, setBgInterval }
+  async function setBgInterval(interval) {
+    await patch('/settings', { bgInterval: interval })
+    settings.value = { ...settings.value, bgInterval: interval }
+  }
+
+  return { theme, bgInterval, settings, loadSettings, setTheme, setBgInterval }
 })

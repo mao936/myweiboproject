@@ -1,137 +1,197 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { usePostStore } from '@/stores/post'
 import { useUserStore } from '@/stores/user'
+import { get, patch, post, del } from '@/api/client'
+
+vi.mock('@/api/client', () => import('@/api/__mocks__/client'))
+
+function createPostResponse(overrides = {}) {
+  return {
+    id: `post-${Math.random().toString(36).slice(2)}`,
+    author: '我',
+    avatarUrl: null,
+    content: '测试内容',
+    mood: '😊',
+    tags: [],
+    createdAt: new Date().toISOString(),
+    media: [],
+    likes: 0,
+    likedByMe: false,
+    comments: [],
+    isPinned: false,
+    isRetracted: false,
+    isHidden: false,
+    ...overrides
+  }
+}
 
 describe('post store', () => {
   beforeEach(() => {
-    localStorage.clear()
     setActivePinia(createPinia())
+    vi.clearAllMocks()
+    get.mockResolvedValue([])
   })
 
-  function createPost(store, overrides = {}) {
-    return store.addPost({
-      content: '测试内容',
-      mood: '😊',
-      media: [],
-      ...overrides
-    })
+  async function initStore(posts = []) {
+    const store = usePostStore()
+    get.mockResolvedValue(posts)
+    await store.refresh()
+    return store
   }
 
-  it('should add a post', () => {
-    const store = usePostStore()
-    const post = createPost(store, { content: '第一条简讯' })
-    expect(store.posts.length).toBe(1)
-    expect(post.content).toBe('第一条简讯')
-    expect(post.author).toBe('我')
+  it('should load posts on refresh', async () => {
+    const store = await initStore([createPostResponse({ content: '第一条简讯' })])
+    expect(store.filteredPosts.length).toBe(1)
+    expect(store.filteredPosts[0].content).toBe('第一条简讯')
   })
 
-  it('should edit a post', () => {
+  it('should add a post', async () => {
     const store = usePostStore()
-    const post = createPost(store, { content: '旧内容' })
-    store.editPost(post.id, { content: '新内容', mood: '🤔' })
-    expect(store.posts[0].content).toBe('新内容')
-    expect(store.posts[0].mood).toBe('🤔')
+    const created = createPostResponse({ content: '第一条简讯' })
+    post.mockResolvedValue(created)
+    await store.refresh()
+    const postResult = await store.addPost({ content: '第一条简讯', mood: '😊', media: [] })
+    expect(post).toHaveBeenCalledWith('/posts', { content: '第一条简讯', mood: '😊', media: [] })
+    expect(postResult.content).toBe('第一条简讯')
+    expect(store.filteredPosts.length).toBe(1)
   })
 
-  it('should delete a post', () => {
-    const store = usePostStore()
-    const post = createPost(store)
-    store.deletePost(post.id)
-    expect(store.posts.length).toBe(0)
+  it('should edit a post', async () => {
+    const created = createPostResponse({ content: '旧内容' })
+    const store = await initStore([created])
+    const updated = { ...created, content: '新内容', mood: '🤔' }
+    patch.mockResolvedValue(updated)
+    await store.editPost(created.id, { content: '新内容', mood: '🤔' })
+    expect(patch).toHaveBeenCalledWith(`/posts/${created.id}`, { content: '新内容', mood: '🤔' })
+    expect(store.filteredPosts[0].content).toBe('新内容')
+    expect(store.filteredPosts[0].mood).toBe('🤔')
   })
 
-  it('should pin and unpin a post', () => {
-    const store = usePostStore()
-    const post1 = createPost(store, { content: 'post1' })
-    const post2 = createPost(store, { content: 'post2' })
-
-    store.pinPost(post2.id)
-    expect(store.posts.find(p => p.id === post2.id).isPinned).toBe(true)
-    expect(store.posts.find(p => p.id === post1.id).isPinned).toBe(false)
-
-    store.unpinPost(post2.id)
-    expect(store.posts.find(p => p.id === post2.id).isPinned).toBe(false)
-  })
-
-  it('should retract and restore a post', () => {
-    const store = usePostStore()
-    const post = createPost(store)
-    store.retractPost(post.id)
-    expect(store.posts[0].isRetracted).toBe(true)
-    store.retractPost(post.id)
-    expect(store.posts[0].isRetracted).toBe(false)
-  })
-
-  it('should hide and show a post', () => {
-    const store = usePostStore()
-    const post = createPost(store)
-    store.hidePost(post.id)
-    expect(store.posts[0].isHidden).toBe(true)
+  it('should delete a post', async () => {
+    const created = createPostResponse()
+    const store = await initStore([created])
+    del.mockResolvedValue({})
+    await store.deletePost(created.id)
+    expect(del).toHaveBeenCalledWith(`/posts/${created.id}`)
     expect(store.filteredPosts.length).toBe(0)
-    store.showPost(post.id)
-    expect(store.posts[0].isHidden).toBe(false)
+  })
+
+  it('should pin and unpin a post', async () => {
+    const post1 = createPostResponse({ content: 'post1' })
+    const post2 = createPostResponse({ content: 'post2' })
+    const store = await initStore([post1, post2])
+
+    post.mockResolvedValue({ ...post2, isPinned: true })
+    await store.pinPost(post2.id)
+    expect(post).toHaveBeenCalledWith(`/posts/${post2.id}/pin`)
+    expect(store.filteredPosts.find(p => p.id === post2.id).isPinned).toBe(true)
+
+    del.mockResolvedValue({ ...post2, isPinned: false })
+    await store.unpinPost(post2.id)
+    expect(del).toHaveBeenCalledWith(`/posts/${post2.id}/pin`)
+    expect(store.filteredPosts.find(p => p.id === post2.id).isPinned).toBe(false)
+  })
+
+  it('should retract and restore a post', async () => {
+    const created = createPostResponse()
+    const store = await initStore([created])
+
+    post.mockResolvedValue({ ...created, isRetracted: true })
+    await store.retractPost(created.id)
+    expect(store.filteredPosts[0].isRetracted).toBe(true)
+
+    post.mockResolvedValue({ ...created, isRetracted: false })
+    await store.retractPost(created.id)
+    expect(store.filteredPosts[0].isRetracted).toBe(false)
+  })
+
+  it('should hide and show a post', async () => {
+    const created = createPostResponse()
+    const store = await initStore([created])
+
+    post.mockResolvedValue({ ...created, isHidden: true })
+    await store.hidePost(created.id)
+    expect(store.filteredPosts.length).toBe(0)
+
+    del.mockResolvedValue({ ...created, isHidden: false })
+    await store.showPost(created.id)
     expect(store.filteredPosts.length).toBe(1)
   })
 
-  it('should like and unlike a post', () => {
-    const store = usePostStore()
-    const post = createPost(store)
-    store.likePost(post.id)
-    expect(store.posts[0].likes).toBe(1)
-    expect(store.posts[0].likedByMe).toBe(true)
-    store.likePost(post.id)
-    expect(store.posts[0].likes).toBe(0)
-    expect(store.posts[0].likedByMe).toBe(false)
+  it('should like and unlike a post', async () => {
+    const created = createPostResponse()
+    const store = await initStore([created])
+
+    post.mockResolvedValue({ ...created, likes: 1, likedByMe: true })
+    await store.likePost(created.id)
+    expect(store.filteredPosts[0].likes).toBe(1)
+    expect(store.filteredPosts[0].likedByMe).toBe(true)
+
+    post.mockResolvedValue({ ...created, likes: 0, likedByMe: false })
+    await store.likePost(created.id)
+    expect(store.filteredPosts[0].likes).toBe(0)
+    expect(store.filteredPosts[0].likedByMe).toBe(false)
   })
 
-  it('should not like a retracted post', () => {
-    const store = usePostStore()
-    const post = createPost(store)
-    store.retractPost(post.id)
-    store.likePost(post.id)
-    expect(store.posts[0].likes).toBe(0)
+  it('should not like a retracted post', async () => {
+    const created = createPostResponse({ isRetracted: true })
+    const store = await initStore([created])
+    await store.likePost(created.id)
+    expect(post).not.toHaveBeenCalled()
   })
 
-  it('should add comment to a post', () => {
-    const store = usePostStore()
-    const post = createPost(store)
-    store.addComment(post.id, '评论内容')
-    expect(store.posts[0].comments.length).toBe(1)
-    expect(store.posts[0].comments[0].content).toBe('评论内容')
+  it('should add comment to a post', async () => {
+    const created = createPostResponse()
+    const store = await initStore([created])
+    const updated = { ...created, comments: [{ id: 'c1', author: '路人甲', content: '评论内容', createdAt: new Date().toISOString() }] }
+    post.mockResolvedValue(updated)
+    await store.addComment(created.id, '评论内容')
+    expect(post).toHaveBeenCalledWith(`/posts/${created.id}/comments`, { content: '评论内容' })
+    expect(store.filteredPosts[0].comments.length).toBe(1)
+    expect(store.filteredPosts[0].comments[0].content).toBe('评论内容')
   })
 
-  it('should filter posts by search query', () => {
+  it('should filter posts by search query', async () => {
     const store = usePostStore()
-    createPost(store, { content: '关于 Vue 的内容' })
-    createPost(store, { content: '关于 React 的内容' })
-    store.search('Vue')
-    expect(store.filteredPosts.length).toBe(1)
-    expect(store.filteredPosts[0].content).toContain('Vue')
+    get.mockResolvedValue([
+      createPostResponse({ content: '关于 Vue 的内容' }),
+      createPostResponse({ content: '关于 React 的内容' })
+    ])
+    await store.search('Vue')
+    expect(get).toHaveBeenCalledWith('/posts?q=Vue')
+    expect(store.filteredPosts.length).toBe(2)
   })
 
-  it('should sort pinned posts first', () => {
-    const store = usePostStore()
-    const post1 = createPost(store, { content: '普通' })
-    createPost(store, { content: '置顶' })
-    store.pinPost(post1.id)
-    expect(store.filteredPosts[0].content).toBe('普通')
+  it('should sort pinned posts first', async () => {
+    const post1 = createPostResponse({ content: '普通' })
+    const post2 = createPostResponse({ content: '置顶', isPinned: true })
+    const store = await initStore([post1, post2])
+    expect(store.filteredPosts[0].content).toBe('置顶')
   })
 
-  it('should extract tags when adding a post', () => {
+  it('should extract tags when adding a post', async () => {
     const store = usePostStore()
-    const post = createPost(store, { content: '学习#vue 真不错' })
-    expect(post.tags).toContain('vue')
+    const created = createPostResponse({ content: '学习#vue 真不错', tags: ['vue'] })
+    post.mockResolvedValue(created)
+    await store.refresh()
+    const postResult = await store.addPost({ content: '学习#vue 真不错' })
+    expect(postResult.tags).toContain('vue')
   })
 
-  it('should use current user name as author', () => {
+  it('should use current user name as author', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
+    get.mockResolvedValue({ name: '小明', avatarFileId: null, avatarUrl: null })
     const userStore = useUserStore()
-    userStore.updateName('小明')
+    await userStore.loadUser()
 
+    get.mockResolvedValue([])
     const postStore = usePostStore()
-    const post = postStore.addPost({ content: '测试' })
-    expect(post.author).toBe('小明')
+    await postStore.refresh()
+    const created = createPostResponse({ author: '小明', content: '测试' })
+    post.mockResolvedValue(created)
+    const result = await postStore.addPost({ content: '测试' })
+    expect(result.author).toBe('小明')
   })
 })

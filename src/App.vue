@@ -1,17 +1,10 @@
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useUserStore } from '@/stores/user'
 import { usePostStore } from '@/stores/post'
 import { useMediaStore } from '@/stores/media'
 import { useSettingsStore } from '@/stores/settings'
-import {
-  saveMedia,
-  deleteMedia,
-  createObjectURL,
-  cleanupOrphanMedia
-} from '@/db/indexedDB'
-import { generateId } from '@/utils/id'
 import UserCard from '@/components/UserCard.vue'
 import ComposePanel from '@/components/ComposePanel.vue'
 import SearchBox from '@/components/SearchBox.vue'
@@ -24,7 +17,7 @@ const postStore = usePostStore()
 const mediaStore = useMediaStore()
 const settingsStore = useSettingsStore()
 
-const { name, avatarFileId } = storeToRefs(userStore)
+const { name, avatarUrl } = storeToRefs(userStore)
 const { filteredPosts, searchQuery } = storeToRefs(postStore)
 const { theme, bgInterval } = storeToRefs(settingsStore)
 
@@ -37,10 +30,6 @@ const expandedComments = ref(new Set())
 const toastMessage = ref('')
 const toastVisible = ref(false)
 const toastTimer = ref(null)
-const avatarUrl = ref('')
-const postAvatarUrls = ref({})
-const postMediaUrls = ref({})
-const libraryItems = ref([])
 const bgIndex = ref(0)
 const bgSettingsOpen = ref(false)
 
@@ -59,7 +48,7 @@ const backgrounds = [
 ]
 
 const minePosts = computed(() => {
-  let result = postStore.posts.filter(p => p.author === name.value && !p.isHidden)
+  let result = filteredPosts.value.filter(p => p.author === name.value)
 
   if (searchQueryMine.value.trim()) {
     const q = searchQueryMine.value.toLowerCase()
@@ -88,17 +77,6 @@ function showToast(message) {
   }, 2000)
 }
 
-async function loadAvatar() {
-  if (avatarFileId.value) {
-    const url = await createObjectURL(avatarFileId.value)
-    if (url) {
-      avatarUrl.value = url
-      return
-    }
-  }
-  avatarUrl.value = ''
-}
-
 async function updateAvatar(file) {
   const MAX_IMAGE_SIZE = 5 * 1024 * 1024
   if (file.size > MAX_IMAGE_SIZE) {
@@ -106,39 +84,41 @@ async function updateAvatar(file) {
     return
   }
 
-  const fileId = generateId()
-  await saveMedia(fileId, file, { type: 'image', name: file.name, size: file.size })
-
-  if (avatarFileId.value) {
-    await deleteMedia(avatarFileId.value)
+  try {
+    await userStore.updateAvatar(file)
+    showToast('头像已更新')
+  } catch (error) {
+    showToast(error.message || '头像上传失败')
   }
-
-  userStore.updateAvatar(fileId)
-  await loadAvatar()
-  await loadPostAssets()
-  showToast('头像已更新')
 }
 
-function updateName(newName) {
-  userStore.updateName(newName)
+async function updateName(newName) {
+  try {
+    await userStore.updateName(newName)
+  } catch (error) {
+    showToast(error.message || '昵称更新失败')
+  }
 }
 
 async function publishPost() {
-  if (editingPostId.value) {
-    postStore.editPost(editingPostId.value, { content: composeContent.value, mood: composeMood.value })
-    showToast('简讯已更新')
-    editingPostId.value = null
-  } else {
-    const media = mediaStore.getPendingMedia()
-    postStore.addPost({ content: composeContent.value, mood: composeMood.value, media })
-    mediaStore.clearPendingMedia()
-    showToast('发布成功')
-  }
+  try {
+    if (editingPostId.value) {
+      await postStore.editPost(editingPostId.value, { content: composeContent.value, mood: composeMood.value })
+      showToast('简讯已更新')
+      editingPostId.value = null
+    } else {
+      const media = mediaStore.getPendingMedia()
+      await postStore.addPost({ content: composeContent.value, mood: composeMood.value, media })
+      mediaStore.clearPendingMedia()
+      showToast('发布成功')
+    }
 
-  composeContent.value = ''
-  composeMood.value = ''
-  await nextTick()
-  await loadPostAssets()
+    composeContent.value = ''
+    composeMood.value = ''
+    await nextTick()
+  } catch (error) {
+    showToast(error.message || '发布失败')
+  }
 }
 
 function startEdit(post) {
@@ -152,28 +132,13 @@ function startEdit(post) {
 async function deletePost(post) {
   if (!window.confirm('确定要删除这条简讯吗？')) return
 
-  for (const m of post.media || []) {
-    await deleteMedia(m.fileId)
-    if (m.coverId) await deleteMedia(m.coverId)
+  try {
+    await postStore.deletePost(post.id)
+    expandedComments.value.delete(post.id)
+    showToast('已删除')
+  } catch (error) {
+    showToast(error.message || '删除失败')
   }
-
-  postStore.deletePost(post.id)
-  expandedComments.value.delete(post.id)
-  await cleanupOrphans()
-  await loadPostAssets()
-  showToast('已删除')
-}
-
-async function cleanupOrphans() {
-  const usedIds = new Set()
-  if (avatarFileId.value) usedIds.add(avatarFileId.value)
-  for (const post of postStore.posts) {
-    for (const m of post.media || []) {
-      usedIds.add(m.fileId)
-      if (m.coverId) usedIds.add(m.coverId)
-    }
-  }
-  await cleanupOrphanMedia(Array.from(usedIds))
 }
 
 function handleLike(id) {
@@ -229,11 +194,11 @@ function handleTagClick(tag) {
   }
 }
 
-async function handleAddImage() {
+function handleAddImage() {
   imageInput.value?.click()
 }
 
-async function handleAddVideo() {
+function handleAddVideo() {
   videoInput.value?.click()
 }
 
@@ -259,62 +224,18 @@ async function onVideoSelected(event) {
   event.target.value = ''
 }
 
-async function loadPostAvatars() {
-  const ids = new Set()
-  for (const post of postStore.posts) {
-    if (post.avatarFileId) ids.add(post.avatarFileId)
-  }
-
-  const newUrls = {}
-  for (const id of ids) {
-    if (postAvatarUrls.value[id]) {
-      newUrls[id] = postAvatarUrls.value[id]
-    } else {
-      const url = await createObjectURL(id)
-      if (url) newUrls[id] = url
-    }
-  }
-  postAvatarUrls.value = newUrls
-}
-
-async function loadPostMedia() {
-  const map = {}
-  for (const post of postStore.posts) {
-    if (!post.media?.length) continue
-    const resolved = []
-    for (const item of post.media) {
-      const existing = postMediaUrls.value[post.id]?.find(m => m.fileId === item.fileId)
-      if (existing?.url) {
-        resolved.push(existing)
-      } else {
-        const url = await createObjectURL(item.fileId)
-        if (url) resolved.push({ ...item, url })
-      }
-    }
-    if (resolved.length) map[post.id] = resolved
-  }
-  postMediaUrls.value = map
-}
-
-async function loadPostAssets() {
-  await loadPostAvatars()
-  await loadPostMedia()
-}
-
 async function loadLibrary() {
-  await mediaStore.loadMediaLibrary()
-  const items = []
-  for (const item of mediaStore.library) {
-    const url = await createObjectURL(item.id)
-    items.push({ ...item, url })
+  try {
+    await mediaStore.loadMediaLibrary()
+  } catch (error) {
+    showToast(error.message || '加载媒体库失败')
   }
-  libraryItems.value = items
 }
 
 async function deleteLibraryItem(id) {
-  const usedInAvatar = avatarFileId.value === id
-  const usedInPosts = postStore.posts.some(p =>
-    (p.media || []).some(m => m.fileId === id || m.coverId === id)
+  const usedInAvatar = userStore.avatarFileId === id
+  const usedInPosts = filteredPosts.value.some(p =>
+    (p.media || []).some(m => m.id === id || m.coverUrl?.includes(`/api/media/${id}`))
   )
 
   if (usedInAvatar || usedInPosts) {
@@ -322,9 +243,13 @@ async function deleteLibraryItem(id) {
     return
   }
 
-  await deleteMedia(id)
-  await loadLibrary()
-  showToast('媒体已删除')
+  try {
+    await mediaStore.deleteMediaFile(id)
+    await loadLibrary()
+    showToast('媒体已删除')
+  } catch (error) {
+    showToast(error.message || '删除失败')
+  }
 }
 
 function switchTab(tab) {
@@ -335,16 +260,16 @@ function switchTab(tab) {
   }
 }
 
-watch(avatarFileId, loadAvatar)
-watch(() => postStore.posts, loadPostAssets, { deep: true })
-
 onMounted(async () => {
   const hashTab = window.location.hash.replace('#', '')
   if (['home', 'mine', 'library'].includes(hashTab)) {
     currentTab.value = hashTab
   }
-  await loadAvatar()
-  await loadPostAssets()
+  await Promise.all([
+    userStore.loadUser(),
+    settingsStore.loadSettings(),
+    postStore.refresh()
+  ])
 })
 </script>
 
@@ -387,7 +312,7 @@ onMounted(async () => {
 
         <UserCard
           :name="name"
-          :avatar-url="avatarUrl"
+          :avatar-url="avatarUrl || ''"
           @update:name="updateName"
           @update:avatar="updateAvatar"
         />
@@ -418,8 +343,7 @@ onMounted(async () => {
             :key="post.id"
             :post="post"
             :is-mine="post.author === name"
-            :post-avatar-url="postAvatarUrls[post.avatarFileId] || ''"
-            :media="postMediaUrls[post.id]"
+            :post-avatar-url="post.avatarUrl || ''"
             :comments-expanded="expandedComments.has(post.id)"
             @like="handleLike(post.id)"
             @comment="toggleComments(post.id)"
@@ -449,8 +373,7 @@ onMounted(async () => {
             :key="post.id"
             :post="post"
             :is-mine="true"
-            :post-avatar-url="postAvatarUrls[post.avatarFileId] || ''"
-            :media="postMediaUrls[post.id]"
+            :post-avatar-url="post.avatarUrl || ''"
             :comments-expanded="expandedComments.has(post.id)"
             @like="handleLike(post.id)"
             @comment="toggleComments(post.id)"
@@ -474,7 +397,7 @@ onMounted(async () => {
           <h2 style="font-size: 18px; font-weight: 600; margin-bottom: 6px;">媒体库</h2>
           <p style="font-size: 14px; color: var(--text-secondary);">管理本地上传的图片与视频素材</p>
         </div>
-        <LibraryPanel :items="libraryItems" @delete="deleteLibraryItem" />
+        <LibraryPanel :items="mediaStore.library" @delete="deleteLibraryItem" />
       </section>
     </main>
 

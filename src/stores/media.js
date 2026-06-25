@@ -1,12 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import {
-  saveMedia,
-  deleteMedia,
-  getAllMedia,
-  createObjectURL
-} from '@/db/indexedDB'
-import { generateId } from '@/utils/id'
+import { get, del, postFile } from '@/api/client'
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024
 const MAX_VIDEO_SIZE = 50 * 1024 * 1024
@@ -21,9 +15,13 @@ export const useMediaStore = defineStore('media', () => {
       if (file.size > MAX_IMAGE_SIZE) {
         throw new Error(`图片 ${file.name} 超过 5MB 限制`)
       }
-      const fileId = generateId()
-      await saveMedia(fileId, file, { type: 'image', name: file.name, size: file.size })
-      return { fileId, type: 'image', url: URL.createObjectURL(file), name: file.name }
+      const data = await postFile('/media', { file })
+      return {
+        fileId: data.id,
+        type: 'image',
+        url: data.url,
+        name: file.name
+      }
     }
 
     if (type === 'video') {
@@ -34,14 +32,20 @@ export const useMediaStore = defineStore('media', () => {
       if (duration > 60) {
         throw new Error('视频时长不能超过 60 秒')
       }
-      const fileId = generateId()
       const coverBlob = await generateVideoCover(file)
-      const coverId = coverBlob ? generateId() : null
+      const fields = { file, duration }
       if (coverBlob) {
-        await saveMedia(coverId, coverBlob, { type: 'image', name: 'cover', size: coverBlob.size })
+        fields.cover = coverBlob
       }
-      await saveMedia(fileId, file, { type: 'video', name: file.name, size: file.size, coverId, duration })
-      return { fileId, type: 'video', url: URL.createObjectURL(file), coverId, name: file.name, duration }
+      const data = await postFile('/media', fields)
+      return {
+        fileId: data.id,
+        type: 'video',
+        url: data.url,
+        coverUrl: data.coverUrl,
+        name: file.name,
+        duration
+      }
     }
 
     return null
@@ -81,32 +85,27 @@ export const useMediaStore = defineStore('media', () => {
   }
 
   function removePendingMedia(index) {
-    const item = pendingMedia.value[index]
-    if (item) {
-      URL.revokeObjectURL(item.url)
-      pendingMedia.value.splice(index, 1)
-    }
+    pendingMedia.value.splice(index, 1)
   }
 
   function clearPendingMedia() {
-    pendingMedia.value.forEach(m => URL.revokeObjectURL(m.url))
     pendingMedia.value = []
   }
 
   function getPendingMedia() {
-    return pendingMedia.value.map(m => ({ fileId: m.fileId, type: m.type }))
+    return pendingMedia.value.map(m => ({ id: m.fileId, type: m.type }))
   }
 
   async function deleteMediaFile(id) {
-    await deleteMedia(id)
+    await del(`/media/${id}`)
   }
 
   async function loadMediaLibrary() {
-    library.value = await getAllMedia()
+    library.value = await get('/media')
   }
 
-  async function getMediaUrl(id) {
-    return createObjectURL(id)
+  function getMediaUrl(id) {
+    return `http://localhost:3000/api/media/${id}`
   }
 
   return {
