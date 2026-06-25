@@ -87,6 +87,24 @@ describe('PostCard', () => {
     expect(wrapper.emitted('comment')).toHaveLength(1)
   })
 
+  it('emits repost when repost button clicked and shows active state', async () => {
+    const wrapper = mount(PostCard, {
+      props: { post: createPost({ isReposted: true, reposts: 3 }), isMine: false, postAvatarUrl: '' }
+    })
+    expect(wrapper.find('.action-repost').classes()).toContain('active')
+    expect(wrapper.find('.action-repost').text()).toContain('已转发')
+    await wrapper.find('.action-repost').trigger('click')
+    expect(wrapper.emitted('repost')).toHaveLength(1)
+  })
+
+  it('renders repost count when not reposted', () => {
+    const wrapper = mount(PostCard, {
+      props: { post: createPost({ reposts: 5 }), isMine: false, postAvatarUrl: '' }
+    })
+    expect(wrapper.find('.action-repost').text()).toContain('5')
+    expect(wrapper.find('.action-repost').classes()).not.toContain('active')
+  })
+
   it('shows mine actions when isMine', () => {
     const wrapper = mount(PostCard, {
       props: { post: createPost(), isMine: true, postAvatarUrl: '' }

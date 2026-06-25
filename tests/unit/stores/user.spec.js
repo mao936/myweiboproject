@@ -13,9 +13,12 @@ describe('user store', () => {
   })
 
   it('should load user on init', async () => {
+    get.mockResolvedValueOnce({ name: '我', avatarFileId: null, avatarUrl: null })
+    get.mockResolvedValueOnce([])
     const store = useUserStore()
     await store.loadUser()
     expect(get).toHaveBeenCalledWith('/me')
+    expect(get).toHaveBeenCalledWith('/me/reposts')
     expect(store.name).toBe('我')
     expect(store.avatarFileId).toBeNull()
   })
@@ -62,6 +65,33 @@ describe('user store', () => {
     await store.toggleFavorite('p1')
     expect(del).toHaveBeenCalledWith('/me/favorites/p1')
     expect(store.isFavorite('p1')).toBe(false)
+  })
+
+  it('should load reposts', async () => {
+    get.mockResolvedValue(['p1', 'p2'])
+    const store = useUserStore()
+    await store.loadReposts()
+    expect(get).toHaveBeenCalledWith('/me/reposts')
+    expect(store.repostedPostIds).toEqual(['p1', 'p2'])
+    expect(store.isReposted('p1')).toBe(true)
+    expect(store.isReposted('p3')).toBe(false)
+  })
+
+  it('should add repost', async () => {
+    const store = useUserStore()
+    store.repostedPostIds = ['p1']
+    store.addRepost('p2')
+    expect(store.isReposted('p2')).toBe(true)
+    store.addRepost('p2')
+    expect(store.repostedPostIds).toEqual(['p1', 'p2'])
+  })
+
+  it('should remove repost', async () => {
+    const store = useUserStore()
+    store.repostedPostIds = ['p1', 'p2']
+    store.removeRepost('p1')
+    expect(store.isReposted('p1')).toBe(false)
+    expect(store.isReposted('p2')).toBe(true)
   })
 
   it('should update name', async () => {

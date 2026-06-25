@@ -16,7 +16,7 @@ const avatarUrl = computed(() => props.postAvatarUrl || props.post.avatarUrl || 
 
 const displayMedia = computed(() => props.media || props.post.media || [])
 
-const emit = defineEmits(['like', 'favorite', 'comment', 'edit', 'delete', 'pin', 'retract', 'hide', 'add-comment', 'tag-click'])
+const emit = defineEmits(['like', 'favorite', 'comment', 'repost', 'edit', 'delete', 'pin', 'retract', 'hide', 'add-comment', 'tag-click'])
 
 const timeText = computed(() => {
   const pinned = props.post.isPinned ? '置顶 · ' : ''
@@ -116,10 +116,12 @@ function onRetract() {
       </button>
       <button
         class="action-btn action-repost"
+        :class="{ active: post.isReposted }"
         type="button"
         :disabled="post.isRetracted"
+        @click="$emit('repost')"
       >
-        <span>{{ post.reposts || '转发' }}</span>
+        <span>{{ post.isReposted ? '已转发' : (post.reposts || '转发') }}</span>
       </button>
     </div>
 

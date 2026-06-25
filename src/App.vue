@@ -11,6 +11,7 @@ import SearchBox from '@/components/SearchBox.vue'
 import PostCard from '@/components/PostCard.vue'
 import LibraryPanel from '@/components/LibraryPanel.vue'
 import BackgroundSlider from '@/components/BackgroundSlider.vue'
+import AdBanner from '@/components/AdBanner.vue'
 
 const userStore = useUserStore()
 const postStore = usePostStore()
@@ -24,6 +25,7 @@ const { theme, bgInterval } = storeToRefs(settingsStore)
 const currentTab = ref('home')
 const searchQueryMine = ref('')
 const searchQueryFavorites = ref('')
+const searchQueryReposts = ref('')
 const composeContent = ref('')
 const composeMood = ref('')
 const editingPostId = ref(null)
@@ -72,6 +74,25 @@ const favoritePosts = computed(() => {
 
   if (searchQueryFavorites.value.trim()) {
     const q = searchQueryFavorites.value.toLowerCase()
+    result = result.filter(p =>
+      p.content.toLowerCase().includes(q) ||
+      p.author.toLowerCase().includes(q) ||
+      (p.tags || []).some(tag => tag.toLowerCase().includes(q))
+    )
+  }
+
+  return result.sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1
+    if (!a.isPinned && b.isPinned) return 1
+    return new Date(b.createdAt) - new Date(a.createdAt)
+  })
+})
+
+const repostedPosts = computed(() => {
+  let result = filteredPosts.value.filter(p => p.isReposted)
+
+  if (searchQueryReposts.value.trim()) {
+    const q = searchQueryReposts.value.toLowerCase()
     result = result.filter(p =>
       p.content.toLowerCase().includes(q) ||
       p.author.toLowerCase().includes(q) ||
@@ -167,6 +188,10 @@ function handleLike(id) {
 
 function handleFavorite(id) {
   postStore.toggleFavorite(id)
+}
+
+function handleRepost(id) {
+  postStore.toggleRepost(id)
 }
 
 function toggleComments(id) {
@@ -288,17 +313,19 @@ function tabLabel(tab) {
   if (tab === 'home') return '首页'
   if (tab === 'mine') return '我的'
   if (tab === 'favorites') return '收藏'
+  if (tab === 'reposts') return '转发'
   return '媒体库'
 }
 
 onMounted(async () => {
   const hashTab = window.location.hash.replace('#', '')
-  if (['home', 'mine', 'favorites', 'library'].includes(hashTab)) {
+  if (['home', 'mine', 'favorites', 'reposts', 'library'].includes(hashTab)) {
     currentTab.value = hashTab
   }
   await Promise.all([
     userStore.loadUser(),
     userStore.loadFavorites(),
+    userStore.loadReposts(),
     settingsStore.loadSettings(),
     postStore.refresh()
   ])
@@ -319,7 +346,7 @@ onMounted(async () => {
         <a href="#" class="logo">我的简讯</a>
         <nav class="nav">
           <button
-            v-for="tab in ['home', 'mine', 'favorites', 'library']"
+            v-for="tab in ['home', 'mine', 'favorites', 'reposts', 'library']"
             :key="tab"
             class="nav-item"
             :class="{ active: currentTab === tab }"
@@ -334,6 +361,8 @@ onMounted(async () => {
 
     <main class="main">
       <section v-show="currentTab === 'home'" class="tab-panel">
+        <AdBanner position="top" />
+
         <div class="banner">
           <img class="banner-image" src="/images/banners/banner1.jpg" alt="Banner">
           <div class="banner-content">
@@ -380,6 +409,7 @@ onMounted(async () => {
             @like="handleLike(post.id)"
             @favorite="handleFavorite(post.id)"
             @comment="toggleComments(post.id)"
+            @repost="handleRepost(post.id)"
             @edit="startEdit(post)"
             @delete="deletePost(post)"
             @pin="handlePin(post)"
@@ -411,6 +441,7 @@ onMounted(async () => {
             @like="handleLike(post.id)"
             @favorite="handleFavorite(post.id)"
             @comment="toggleComments(post.id)"
+            @repost="handleRepost(post.id)"
             @edit="startEdit(post)"
             @delete="deletePost(post)"
             @pin="handlePin(post)"
@@ -442,6 +473,7 @@ onMounted(async () => {
             @like="handleLike(post.id)"
             @favorite="handleFavorite(post.id)"
             @comment="toggleComments(post.id)"
+            @repost="handleRepost(post.id)"
             @edit="startEdit(post)"
             @delete="deletePost(post)"
             @pin="handlePin(post)"
@@ -454,6 +486,40 @@ onMounted(async () => {
         <div v-else class="empty-state">
           <p class="empty-title">{{ searchQueryFavorites.trim() ? '未找到相关简讯' : '还没有收藏' }}</p>
           <p class="empty-desc">{{ searchQueryFavorites.trim() ? '换个关键词试试吧' : '看到喜欢的简讯，点击收藏吧' }}</p>
+        </div>
+      </section>
+
+      <section v-show="currentTab === 'reposts'" class="tab-panel">
+        <AdBanner position="sidebar" />
+
+        <SearchBox
+          v-model="searchQueryReposts"
+          placeholder="搜索转发"
+        />
+        <ul v-if="repostedPosts.length" class="post-list">
+          <PostCard
+            v-for="post in repostedPosts"
+            :key="post.id"
+            :post="post"
+            :is-mine="post.author === name"
+            :post-avatar-url="post.avatarUrl || ''"
+            :comments-expanded="expandedComments.has(post.id)"
+            @like="handleLike(post.id)"
+            @favorite="handleFavorite(post.id)"
+            @comment="toggleComments(post.id)"
+            @repost="handleRepost(post.id)"
+            @edit="startEdit(post)"
+            @delete="deletePost(post)"
+            @pin="handlePin(post)"
+            @retract="handleRetract(post)"
+            @hide="handleHide(post)"
+            @add-comment="addComment(post.id, $event)"
+            @tag-click="handleTagClick"
+          />
+        </ul>
+        <div v-else class="empty-state">
+          <p class="empty-title">{{ searchQueryReposts.trim() ? '未找到相关简讯' : '还没有转发' }}</p>
+          <p class="empty-desc">{{ searchQueryReposts.trim() ? '换个关键词试试吧' : '看到喜欢的简讯，点击转发吧' }}</p>
         </div>
       </section>
 
