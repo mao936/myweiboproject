@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { getUser, updateUser, setAvatar, removeAvatar, getFavorites, addFavorite, removeFavorite } from '../store/userStore.js'
+import { getUser, updateUser, setAvatar, removeAvatar, getFavorites, addFavorite, removeFavorite, getReposts } from '../store/userStore.js'
 import { saveMedia, getMediaData, getMedia } from '../store/mediaStore.js'
 import { getPost } from '../store/postStore.js'
 import { generateId } from '../utils/id.js'
@@ -46,6 +46,10 @@ me.delete('/avatar', (c) => {
 
 me.get('/favorites', (c) => {
   return c.json(getFavorites())
+})
+
+me.get('/reposts', (c) => {
+  return c.json(getReposts())
 })
 
 me.post('/favorites/:postId', (c) => {

@@ -4,6 +4,7 @@ import me from './routes/me.js'
 import posts from './routes/posts.js'
 import media from './routes/media.js'
 import settings from './routes/settings.js'
+import ads from './routes/ads.js'
 import './store/index.js'
 
 const app = new Hono()
@@ -19,6 +20,7 @@ app.route('/api/me', me)
 app.route('/api/posts', posts)
 app.route('/api/media', media)
 app.route('/api/settings', settings)
+app.route('/api/ads', ads)
 
 app.onError((err, c) => {
   console.error(err)

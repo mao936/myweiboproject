@@ -8,6 +8,7 @@ import {
   pinPost,
   unpinPost,
   toggleLike,
+  toggleRepost,
   toggleRetract,
   hidePost,
   showPost,
@@ -78,6 +79,13 @@ posts.delete('/:id/pin', (c) => {
 posts.post('/:id/like', (c) => {
   const id = c.req.param('id')
   const post = toggleLike(id)
+  if (!post) return c.json({ error: 'post not found or retracted' }, 404)
+  return c.json(enrichPost(post))
+})
+
+posts.post('/:id/repost', (c) => {
+  const id = c.req.param('id')
+  const post = toggleRepost(id)
   if (!post) return c.json({ error: 'post not found or retracted' }, 404)
   return c.json(enrichPost(post))
 })

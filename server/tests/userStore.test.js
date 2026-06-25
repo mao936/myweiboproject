@@ -17,7 +17,7 @@ describe('userStore', () => {
   })
 
   it('returns seeded user', () => {
-    expect(getUser()).toEqual({ name: '我', avatarFileId: null, avatarUrl: null, favorites: [] })
+    expect(getUser()).toEqual({ name: '我', avatarFileId: null, avatarUrl: null, favorites: [], repostedPostIds: [] })
   })
 
   it('updates user name', () => {
@@ -40,7 +40,7 @@ describe('userStore', () => {
 
   it('ignores unknown fields', () => {
     updateUser({ name: 'Bob', age: 30 })
-    expect(getUser()).toEqual({ name: 'Bob', avatarFileId: null, avatarUrl: null, favorites: [] })
+    expect(getUser()).toEqual({ name: 'Bob', avatarFileId: null, avatarUrl: null, favorites: [], repostedPostIds: [] })
   })
 
   it('manages favorites', () => {

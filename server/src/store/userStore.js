@@ -1,9 +1,9 @@
 const SERVER_BASE_URL = process.env.SERVER_BASE_URL || 'http://localhost:3000'
 
-let user = { name: '我', avatarFileId: null, favorites: [] }
+let user = { name: '我', avatarFileId: null, favorites: [], repostedPostIds: [] }
 
 export function resetUser() {
-  user = { name: '我', avatarFileId: null, favorites: [] }
+  user = { name: '我', avatarFileId: null, favorites: [], repostedPostIds: [] }
 }
 
 function toMediaUrl(id) {
@@ -49,4 +49,24 @@ export function removeFavorite(postId) {
 
 export function isFavorite(postId) {
   return user.favorites.includes(postId)
+}
+
+export function getReposts() {
+  return [...user.repostedPostIds]
+}
+
+export function addRepost(postId) {
+  if (!user.repostedPostIds.includes(postId)) {
+    user.repostedPostIds.push(postId)
+  }
+  return getReposts()
+}
+
+export function removeRepost(postId) {
+  user.repostedPostIds = user.repostedPostIds.filter(id => id !== postId)
+  return getReposts()
+}
+
+export function isReposted(postId) {
+  return user.repostedPostIds.includes(postId)
 }
