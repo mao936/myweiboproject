@@ -149,6 +149,22 @@ describe('post store', () => {
     expect(store.filteredPosts[0].isFavorited).toBe(false)
   })
 
+  it('should toggle repost on a post', async () => {
+    const created = createPostResponse()
+    const store = await initStore([created])
+
+    post.mockResolvedValue({ ...created, isReposted: true, reposts: 1 })
+    await store.toggleRepost(created.id)
+    expect(post).toHaveBeenCalledWith(`/posts/${created.id}/repost`)
+    expect(store.filteredPosts[0].isReposted).toBe(true)
+    expect(store.filteredPosts[0].reposts).toBe(1)
+
+    post.mockResolvedValue({ ...created, isReposted: false, reposts: 0 })
+    await store.toggleRepost(created.id)
+    expect(store.filteredPosts[0].isReposted).toBe(false)
+    expect(store.filteredPosts[0].reposts).toBe(0)
+  })
+
   it('should not like a retracted post', async () => {
     const created = createPostResponse({ isRetracted: true })
     const store = await initStore([created])

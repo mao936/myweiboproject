@@ -93,6 +93,11 @@ export const usePostStore = defineStore('post', () => {
     replacePost(updated)
   }
 
+  async function toggleRepost(id) {
+    const updated = await postRequest(`/posts/${id}/repost`)
+    replacePost(updated)
+  }
+
   async function addComment(id, content) {
     const target = allPosts.value.find(p => p.id === id)
     if (!target || target.isRetracted) return
@@ -115,6 +120,7 @@ export const usePostStore = defineStore('post', () => {
     showPost,
     likePost,
     toggleFavorite,
+    toggleRepost,
     addComment
   }
 })
